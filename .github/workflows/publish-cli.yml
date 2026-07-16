@@ -1,0 +1,85 @@
+name: Publish CLI
+
+on:
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish-cli-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+    environment: npm-production
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.18.0
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release tag and package metadata
+        id: release
+        run: node scripts/check-release.mjs "${GITHUB_REF_NAME}"
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify packed CLI
+        run: pnpm smoke:package
+
+      - name: Publish to npm
+        env:
+          CLI_VERSION: ${{ steps.release.outputs.version }}
+          NPM_DIST_TAG: ${{ steps.release.outputs.npm-tag }}
+        run: |
+          if npm view "@toughcrowd/cli@${CLI_VERSION}" version --json >/dev/null 2>&1; then
+            echo "@toughcrowd/cli@${CLI_VERSION} already exists; skipping npm publish"
+          else
+            npm publish --access public --tag "${NPM_DIST_TAG}"
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLI_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "GitHub release ${GITHUB_REF_NAME} already exists; skipping creation"
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --title "Tough Crowd CLI ${CLI_VERSION}"
+          fi

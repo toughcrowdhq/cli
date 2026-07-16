@@ -1,0 +1,58 @@
+{
+  "name": "@toughcrowd/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The command-line client for Tough Crowd",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/toughcrowdhq/cli#readme",
+  "bugs": {
+    "url": "https://github.com/toughcrowdhq/cli/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/toughcrowdhq/cli.git"
+  },
+  "type": "module",
+  "packageManager": "pnpm@10.13.1",
+  "bin": {
+    "toughcrowd": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "changeset:version": "changeset version",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "lint": "eslint src scripts --max-warnings 0",
+    "smoke:package": "node scripts/smoke-package.mjs",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.19.1",
+    "@vitest/eslint-plugin": "^1.6.23",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.64.0",
+    "vitest": "^4.1.6"
+  }
+}

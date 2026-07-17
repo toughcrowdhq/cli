@@ -49,6 +49,35 @@ describe("requestJson", () => {
     });
   });
 
+  it("does not send content-type for requests without a body", async () => {
+    const fetch = createFetch(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await requestJson({
+      method: "GET",
+      path: "/api/example",
+      authorization: "Bearer tc_secret",
+      requestId: "req_cli_123",
+      fetch,
+      timers: immediateTimers,
+      metadata: stableMetadata,
+      decode: decodeOkResponse,
+    });
+
+    expect(readHeaders(fetch.calls[0].init.headers)).toEqual({
+      accept: "application/json",
+      authorization: "Bearer tc_secret",
+      "user-agent": "@toughcrowd/cli/1.2.3 node/22.14.0 linux/x64",
+      "x-request-id": "req_cli_123",
+      "x-toughcrowd-client": "@toughcrowd/cli/1.2.3",
+      "x-toughcrowd-runtime": "node/22.14.0; linux; x64",
+    });
+  });
+
   it.each([
     ["/v1/example"],
     ["https://evil.test/api/example"],
@@ -237,6 +266,43 @@ describe("requestJson", () => {
     });
   });
 
+  it("keeps structured API errors even when safe strings are empty", async () => {
+    const error = await captureApiClientError(
+      requestJson({
+        method: "GET",
+        path: "/api/example",
+        authorization: "Bearer tc_secret",
+        fetch: createFetch(
+          new Response(
+            JSON.stringify({
+              error: {
+                code: "",
+                message: "",
+                fields: [{ field: "prompt", message: "", code: "" }],
+              },
+              requestId: "req_empty",
+            }),
+            {
+              status: 400,
+              headers: { "content-type": "application/json" },
+            },
+          ),
+        ),
+        timers: immediateTimers,
+        decode: decodeOkResponse,
+      }),
+    );
+
+    expect(error).toMatchObject({
+      kind: "api",
+      status: 400,
+      code: "",
+      message: "",
+      requestId: "req_empty",
+      fields: [{ field: "prompt", message: "", code: "" }],
+    });
+  });
+
   it("maps network failures without leaking credentials", async () => {
     const error = await captureApiClientError(
       requestJson({
@@ -300,6 +366,22 @@ describe("requestJson", () => {
       kind: "timeout",
       message: "API request timed out",
     });
+  });
+
+  it("rejects invalid timeout options as programmer errors", async () => {
+    await expect(
+      requestJson({
+        method: "GET",
+        path: "/api/example",
+        authorization: "Bearer tc_secret",
+        timeoutMs: 0,
+        fetch: createFetch(new Response("{}")),
+        timers: immediateTimers,
+        decode: decodeOkResponse,
+      }),
+    ).rejects.toThrow(
+      new TypeError("API request timeout must be greater than zero"),
+    );
   });
 });
 

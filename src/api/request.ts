@@ -56,10 +56,7 @@ export async function requestJson<T>(
   const url = createApiUrl(origin, options.path);
   const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    throw new ApiClientError({
-      kind: "malformed-response",
-      message: "API request timeout must be greater than zero",
-    });
+    throw new TypeError("API request timeout must be greater than zero");
   }
 
   const timeoutController = new AbortController();
@@ -100,13 +97,6 @@ function createApiUrl(origin: string, path: string): URL {
     });
   }
 
-  if (path.startsWith("//")) {
-    throw new ApiClientError({
-      kind: "malformed-response",
-      message: "API request path must be relative to the API origin",
-    });
-  }
-
   const url = new URL(path, origin);
   if (url.origin !== origin || `${url.pathname}${url.search}` !== path) {
     throw new ApiClientError({
@@ -126,12 +116,15 @@ function createHeaders(
   const headers = new Headers({
     accept: jsonContentType,
     authorization: options.authorization,
-    "content-type": jsonContentType,
     "user-agent": `${metadata.cliName}/${metadata.cliVersion} node/${metadata.nodeVersion} ${metadata.platform}/${metadata.arch}`,
     "x-toughcrowd-client": `${metadata.cliName}/${metadata.cliVersion}`,
     "x-request-id": requestId,
     "x-toughcrowd-runtime": `node/${metadata.nodeVersion}; ${metadata.platform}; ${metadata.arch}`,
   });
+
+  if (options.body !== undefined) {
+    headers.set("content-type", jsonContentType);
+  }
 
   if (options.idempotencyKey != null) {
     headers.set("idempotency-key", options.idempotencyKey);

@@ -114,7 +114,7 @@ function readOptionalBoundedString(
 
 function readBoundedString(value: unknown, maxLength: number): string | null {
   if (typeof value !== "string") return null;
-  if (value.length === 0 || value.length > maxLength) return null;
+  if (value.length > maxLength) return null;
 
   return value;
 }

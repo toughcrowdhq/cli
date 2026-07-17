@@ -12,6 +12,19 @@
 - npm authentication uses Trusted Publishing with GitHub OIDC.
 - Do not create or store `NPM_TOKEN` or another long-lived publish token.
 
+After merging a Changesets release PR, update local `main` and run:
+
+```sh
+pnpm release
+```
+
+This is the maintainer's explicit release gate. It refuses to run unless `main`
+is clean and synchronized with `origin/main`, validates the package version and
+changelog, runs the full release checks, asks for confirmation, creates the
+annotated `v<version>` tag, and pushes only that tag. The tag-triggered workflow
+publishes through npm Trusted Publishing and creates the GitHub Release. Do not
+run `npm publish` manually after the `0.1.0` bootstrap.
+
 The public repository enables npm provenance for OIDC-published releases. The
 first package version is the exception: npm cannot configure a trusted
 publisher or staged publish for a package that does not yet exist, so `0.1.0`

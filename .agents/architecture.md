@@ -84,6 +84,37 @@ or mutates a session.
 `watch` output should be append-only and preserve terminal scrollback. It is
 not the full-screen TUI.
 
+### Future TUI Boundary
+
+Do not install or choose a TUI framework until `toughcrowd ui` has an approved
+product scope. Anticipate it through application boundaries instead:
+
+- Commander commands and the future TUI are separate adapters over the same
+  application operations and public API client.
+- Normalize replayable SSE messages into a public CLI `SessionEvent` model
+  before any presentation layer consumes them.
+- Expose live activity to consumers as an `AsyncIterable<SessionEvent>` that
+  accepts an `AbortSignal`, not as Commander callbacks or renderer-specific
+  state.
+- Use a pure session-state reducer when a consumer needs a current projection
+  of the event stream. Human `watch`, JSONL output, and the TUI may consume the
+  same events differently.
+- Keep raw terminal mode, alternate-screen behavior, focus, mouse handling, and
+  cursor control exclusive to `toughcrowd ui`. Inline commands must never take
+  ownership of the terminal this way.
+- Lazy-load the TUI entry point so ordinary commands do not load its runtime or
+  pay its startup cost.
+- Share API types, event normalization, reducers, and application operations.
+  Do not invent shared terminal components or a generic UI framework before a
+  real TUI requires them.
+
+When implementation begins, evaluate the then-current Ink and OpenTUI releases
+against Node support, npm artifact size, cross-platform behavior, rendering
+performance, accessibility, testability, native build requirements, and future
+standalone-binary packaging. Ink is the conservative Node/React candidate;
+OpenTUI is the higher-performance candidate with a native core. Neither is a
+current dependency or settled choice.
+
 ## Canonical Vocabulary
 
 `session` is the public unit of coding-agent work across the web app, CLI,
@@ -153,6 +184,102 @@ toughcrowd session "Fix the flaky checkout test"
 That form conflicts with static subcommands when a prompt is `list`, `show`,
 or another reserved command word. `session new` keeps creation explicit and
 preserves `session` as a discoverable resource namespace.
+
+## Command Implementation
+
+Use Commander as the argument parser, command router, usage-error handler, and
+help generator.
+
+Commander fits this CLI because it supports nested commands, strict unknown
+option and excess-argument handling, asynchronous actions through
+`parseAsync()`, configurable help and output, and exit overrides for tests. Its
+supported Node range is compatible with this package's Node 22.14 minimum.
+
+Treat Commander as an outer adapter, not as the application framework:
+
+```text
+process entry point
+  -> Commander command definitions
+    -> typed application operations
+      -> public API client and session event source
+        -> human, JSON, JSONL, or future TUI presentation
+```
+
+Command actions must translate parsed arguments and options into ordinary typed
+inputs, call one application operation, and pass the result to the selected
+presentation path. Application operations, API clients, event reducers, and
+presenters must not import Commander or receive Commander `Command` instances.
+
+Use the regular `commander` package initially. Do not add
+`@commander-js/extra-typings` until repeated option-typing mistakes demonstrate
+that its additional generic types improve this codebase. Explicit option DTOs
+at the adapter boundary are the initial default.
+
+Do not adopt oclif now. Its plugin system, lifecycle hooks, generated
+documentation, autocomplete plugins, installer tooling, and command discovery
+become valuable for a much larger or third-party-extensible CLI, but its
+project conventions and runtime surface are unnecessary for the initial public
+client. Reconsider it only if those platform capabilities become requirements.
+
+Clipanion is the preferred fallback if Commander proves inadequate and stronger
+type-driven command definitions become the deciding requirement. Yargs and
+Citty are not preferred: Yargs exposes a broader builder and coercion model than
+this CLI needs, while Citty's young public surface is a weaker foundation for
+commands and flags that are compatibility contracts. Do not hand-build nested
+routing and help on Node's `util.parseArgs`.
+
+### Source Boundaries
+
+Organize implementation around these responsibilities as the command surface
+grows:
+
+```text
+src/
+  index.ts                    process boundary
+  cli/
+    runCli.ts                 parse arguments and return an exit code
+    createProgram.ts          configure the Commander root
+    runtime.ts                injected process capabilities
+    commands/                 noun and verb command adapters
+  application/                framework-independent operations
+  api/                        public REST client, SSE client, and DTOs
+  events/                     normalized events and pure reducers
+  output/                     human, JSON, and JSONL presentation
+  ui/                         absent until the TUI is implemented
+```
+
+This is a responsibility map, not a requirement to create empty directories or
+one file per command before their complexity justifies it.
+
+### Process And Error Boundary
+
+Keep the executable process boundary small. Evolve the current CLI entry point
+toward an interface like:
+
+```ts
+runCli(args: readonly string[], runtime: CliRuntime): Promise<number>
+```
+
+Rules:
+
+- `src/index.ts` owns `process.argv`, OS signals, and assigning
+  `process.exitCode`.
+- Command handlers and application operations must not call `process.exit()`.
+- Inject stdout, stderr, environment access, URL opening, and other process
+  capabilities needed by tests or alternate clients.
+- Configure Commander output and exit overrides so help, version output, usage
+  failures, and suggestions are testable without terminating the test process.
+- Map parser and application failures to stable public exit categories at one
+  boundary.
+- Use one `AbortController` for `SIGINT` and `SIGTERM`; pass its signal through
+  application operations, fetch calls, SSE streams, and future TUI shutdown.
+- Install Commander as a runtime `dependency`, not a `devDependency`, because
+  it is required by the packed executable.
+
+The test suite should assert literal help, errors, stdout, stderr, and exit
+codes through `runCli`. The package smoke test remains responsible for proving
+that the installed tarball exposes and executes only the canonical
+`toughcrowd` binary.
 
 ## Session Command Surface
 

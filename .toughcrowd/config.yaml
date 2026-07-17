@@ -1,0 +1,8 @@
+version: 1
+
+runtime:
+  kind: docker-compose
+  composeFile: docker-compose.yml
+
+resources:
+  class: economy

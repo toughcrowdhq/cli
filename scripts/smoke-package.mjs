@@ -18,7 +18,7 @@ const npmEnvironment = {
 
 assert(
   Object.keys(metadata.bin ?? {}).length === 1 &&
-    metadata.bin?.toughcrowd === "./dist/index.js",
+    metadata.bin?.toughcrowd === "dist/index.js",
   "CLI package must expose only the toughcrowd executable",
 );
 

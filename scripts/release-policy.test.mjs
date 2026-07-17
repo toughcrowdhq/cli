@@ -14,7 +14,7 @@ const publishableMetadata = {
     registry: "https://registry.npmjs.org",
   },
   bin: {
-    toughcrowd: "./dist/index.js",
+    toughcrowd: "dist/index.js",
   },
 };
 

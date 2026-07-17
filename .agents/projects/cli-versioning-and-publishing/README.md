@@ -88,10 +88,10 @@ supported older line actually needs a release.
 - [x] Add strict tag, metadata, and dist-tag validation.
 - [x] Add npm tarball and installed-binary verification.
 - [x] Add the Apache-2.0 license and public repository metadata.
-- [ ] Create or confirm the `@toughcrowd` npm organization, require 2FA for all
-      owners, and securely store account recovery methods. One real owner is
-      acceptable while the company has one maintainer; never add a fake or
-      shared owner.
+- [x] Create or confirm the `@toughcrowd` npm organization and require 2FA for
+      all owners. One real owner is acceptable while the company has one
+      maintainer; never add a fake or shared owner.
+- [ ] Securely store npm account recovery methods.
 - [x] Enable GitHub Actions to create pull requests.
 - [x] Enable private vulnerability reporting for the public repository.
 - [x] Create GitHub environment `npm-production` and restrict deployments to
@@ -100,12 +100,12 @@ supported older line actually needs a release.
 - [x] Create an active tag ruleset for `v*` that restricts creation, update, and
       deletion to release maintainers.
 - [x] Remove `private: true` after the external protections are complete.
-- [ ] Create local tag `v0.1.0`, verify its exact artifact, and publish
+- [x] Create local tag `v0.1.0`, verify its exact artifact, and publish
       `@toughcrowd/cli@0.1.0` interactively with maintainer 2FA.
-- [ ] Register `publish-cli.yml` as the npm Trusted Publisher for
+- [x] Register `publish-cli.yml` as the npm Trusted Publisher for
       `toughcrowdhq/cli`, environment `npm-production`, action `npm publish`.
-- [ ] Require 2FA and disallow traditional npm publishing tokens.
-- [ ] Push `v0.1.0` and verify the idempotent workflow and GitHub Release.
+- [x] Require 2FA and disallow traditional npm publishing tokens.
+- [x] Push `v0.1.0` and verify the idempotent workflow and GitHub Release.
 
 ## Acceptance Criteria
 

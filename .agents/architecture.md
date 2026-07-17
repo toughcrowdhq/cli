@@ -348,8 +348,9 @@ independent top-level `agent`, `model`, or `provider` namespaces.
 ### `auth`
 
 Authentication operations likely include `login`, `status`, and `logout`.
-User-managed API tokens may later live beneath `auth token` rather than becoming
-an unrelated top-level namespace.
+API keys are initially created and managed in the web application. If
+dogfooding demonstrates a need for terminal key lifecycle management, place it
+beneath `auth key` rather than introducing an unrelated top-level namespace.
 
 ### `integration`
 
@@ -452,36 +453,43 @@ toughcrowd auth logout
 ```
 
 `auth status` should report the API origin, authenticated identity, credential
-source, and relevant expiration state without revealing credential material.
-`auth logout` must remove the local credential and revoke the corresponding
-server-side refresh session when possible.
+source, key name, and relevant expiration state without revealing credential
+material. `auth logout` removes the locally stored key and should attempt to
+revoke that same server-side key before deletion. It must still remove the
+local credential if network revocation fails and report the remaining remote
+key clearly. It must never revoke a key supplied only through the environment.
 
-### Human And Automation Credentials
+### Initial API Key Authentication
 
-Use browser-approved OAuth for human users. The normal login may use a loopback
-browser callback; offer device authorization for remote, SSH, and headless
-environments. The CLI is a public OAuth client and must not contain or depend on
-a confidential client secret.
+An account currently represents one user, so use account-owned API keys for
+both interactive CLI use and unattended automation. Do not build OAuth,
+loopback callbacks, device authorization, access-token refresh, or a separate
+personal-token taxonomy until multi-user accounts or demonstrated login
+friction justifies that machinery.
 
-Human login uses a short-lived access token and a renewable refresh session.
-The server owns expiration and revocation policy; the initial policy target is:
+The service should allow multiple independently named keys per account. Every
+key must be high entropy, expiring, displayed only at creation, stored as a
+one-way verifier, individually revocable, and accompanied by safe creation,
+last-used, expiration, and revocation metadata. Initial keys inherit the
+account's product permissions; do not introduce unused key scopes before the
+product has meaningfully different permission sets.
 
-```text
-access token         1 hour
-refresh inactivity  30 days
-absolute login      90 days
-device code         10 minutes
-```
+`auth login` should direct the user to create a key in the web application,
+read the pasted key through a hidden interactive prompt, validate it against
+the resolved API origin, and store it through the configured credential store.
+Do not accept a key as a command-line option where it can leak through shell
+history or process listings.
 
-Refresh access tokens automatically while the refresh session remains valid.
-Password or security events, administrative revocation, and logout must be able
-to revoke the refresh session.
+Supply non-persisted keys to CI, automation, and local debugging through
+`TOUGHCROWD_API_KEY`. An environment key is runtime-only and must never be
+persisted, refreshed, or modified automatically.
 
-Use separately issued API tokens for CI and unattended automation. API tokens
-must be scoped, expiring, revocable, displayed only at creation, and stored
-hashed by the service. Supply them to the CLI through `TOUGHCROWD_TOKEN`; do not
-add a `--token` option that can leak through shell history or process listings.
-An environment token is runtime-only and must never be persisted automatically.
+If accounts later contain multiple users, existing API keys may remain
+account-owned automation credentials while browser-approved OAuth becomes the
+preferred human login. Both credential types must resolve to the same
+authenticated-principal boundary, and stored credential records must be
+format-versioned and tagged by credential type so the migration does not
+require reinterpreting API keys as OAuth refresh tokens.
 
 ### Credential Storage
 
@@ -531,7 +539,7 @@ them authority.
 The initial environment contract is:
 
 ```text
-TOUGHCROWD_TOKEN
+TOUGHCROWD_API_KEY
 TOUGHCROWD_API_URL
 TOUGHCROWD_WEB_URL
 TOUGHCROWD_REPO
@@ -542,16 +550,15 @@ NO_COLOR
 Credential resolution is separate from ordinary configuration precedence:
 
 ```text
-TOUGHCROWD_TOKEN
+TOUGHCROWD_API_KEY
   > stored credential for the resolved canonical API origin
   > authentication required
 ```
 
-When `TOUGHCROWD_TOKEN` is present, do not load, refresh, persist, or modify a
-stored OAuth credential. Changing `TOUGHCROWD_API_URL` must never send a stored
-production credential to the override origin; use only a credential stored for
-that exact canonical origin or the environment token supplied for the current
-invocation.
+When `TOUGHCROWD_API_KEY` is present, do not load, persist, revoke, or otherwise
+modify a stored API key. Changing `TOUGHCROWD_API_URL` must never send a stored
+production key to the override origin; use only a key stored for that exact
+canonical origin or the environment key supplied for the current invocation.
 
 ## Project CLI Versions And Config Compatibility
 
@@ -705,8 +712,9 @@ A future launcher would require a small stable toolchain manifest and must:
 ## Deferred Decisions
 
 - The minimum command set for the first API-backed CLI release.
-- The exact public OAuth endpoints, client registration, API-token scope
-  taxonomy, and maximum API-token lifetimes.
+- The exact API key format, default lifetime, and maximum lifetime.
+- The product and account-model threshold for adding browser-approved OAuth as
+  the preferred human login.
 - The filename, format, and initial schema for optional project configuration.
 - The public client support window and minimum-version enforcement policy.
 - Whether demonstrated usage ever justifies a Tough Crowd-managed

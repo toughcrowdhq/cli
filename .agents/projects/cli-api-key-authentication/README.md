@@ -2,9 +2,9 @@
 
 ## Goal
 
-Implement `toughcrowd auth login`, `auth status`, and `auth logout` using
-account-owned API keys, origin-scoped credential storage, and the
-`TOUGHCROWD_API_KEY` environment override.
+Implement `toughcrowd auth login` and `auth status` using account-owned API
+keys, origin-scoped credential storage, and the `TOUGHCROWD_API_KEY`
+environment override.
 
 ## Context
 
@@ -29,8 +29,11 @@ This project depends on:
 - [`CLI Command Foundation`](../cli-command-foundation/README.md) for Commander
   routing, `runCli`, injected runtime capabilities, output separation, exit
   handling, and cancellation.
+- [`CLI API Client Foundation`](../cli-api-client-foundation/README.md) for
+  canonical API origins, generated wire types, shared HTTP transport,
+  structured errors, client metadata, retries, cancellation, and redaction.
 - The app repository's `API Key Authentication Service` project for API key
-  verification, bounded identity, and self-revocation endpoints.
+  verification and bounded identity endpoints.
 - The app repository's `Shared Product API` project for the authenticated
   principal, structured errors, request IDs, and supported client metadata.
 
@@ -39,8 +42,9 @@ product session API.
 
 ## Scope
 
-- Add the `auth login`, `auth status`, and `auth logout` command family.
-- Resolve and canonicalize the API and web origins used by authentication.
+- Add the `auth login` and `auth status` command family.
+- Reuse the shared canonical API origin and resolve the web origin used by
+  authentication.
 - Read an API key through a hidden interactive prompt without accepting it as a
   positional argument or command-line option.
 - Open the web API-key settings page when possible and always print a copyable
@@ -54,23 +58,23 @@ product session API.
   keys process-only.
 - Report safe identity, origin, credential source, key name, and expiration
   information through `auth status`.
-- Revoke the currently stored key during logout when possible and remove the
-  local copy even when remote revocation cannot complete.
 - Add redaction, literal-output tests, and installed-package verification for
   the authentication commands.
 
 ## Out Of Scope
 
-- API key creation, listing, arbitrary revocation, or expiration changes from
-  the terminal; those operations initially live in the web application.
+- API key creation, listing, revocation, or expiration changes from the
+  terminal; those operations initially live in the web application.
+- Local credential removal. Re-running `auth login` may replace the stored key
+  only after explicit interactive confirmation.
 - OAuth, browser callbacks, device authorization, access-token refresh, or
   multiple credential types beyond the format tag reserved for migration.
 - Password entry or browser-session cookie import.
 - Multiple accounts for one API origin or directory-selected identity.
 - Project configuration, repository detection, Agent Profile selection, or
   session commands.
-- Persisting, refreshing, revoking, or otherwise modifying an API key supplied
-  through `TOUGHCROWD_API_KEY`.
+- Persisting, refreshing, or otherwise modifying an API key supplied through
+  `TOUGHCROWD_API_KEY`.
 - A command-line `--api-key`, `--token`, or equivalent secret-bearing option.
 - Shell completion, update checks, telemetry, or a TUI.
 
@@ -103,19 +107,6 @@ bounded documented object containing the same safe facts.
 
 No credential is a normal unauthenticated state, not an internal exception.
 The command returns success only when the selected credential is valid.
-
-### `auth logout`
-
-For a stored credential, logout attempts the service's self-revocation
-operation and then removes the local credential. An already invalid, expired,
-or revoked key is still removed successfully. If the API is unavailable, the
-CLI removes the local key, returns a warning that remote revocation was not
-confirmed, and tells the user where to revoke it in the web application.
-
-When `TOUGHCROWD_API_KEY` is present, logout does not read or modify stored
-credentials and does not revoke the environment key. It exits with an
-actionable instruction to unset the variable or revoke the key in the web
-application.
 
 ## Credential Resolution And Storage
 
@@ -162,14 +153,14 @@ unrecognized newer formats. It never writes beneath the current repository.
 
 ### Phase 1 — Authentication And Origin Boundaries
 
-- [ ] Add the `auth` namespace and `login`, `status`, and `logout` Commander
-      adapters over framework-independent authentication operations.
-- [ ] Define canonical API-origin and web-origin value objects with literal
-      valid, invalid, loopback, default-port, deceptive-host, and path tests.
+- [ ] Add the `auth` namespace and `login` and `status` Commander adapters over
+      framework-independent authentication operations.
+- [ ] Reuse the shared canonical API-origin value and define the corresponding
+      web origin with literal valid, invalid, and deceptive-input tests.
 - [ ] Add the API-key credential resolver with environment-before-storage
       precedence and source metadata.
-- [ ] Add a minimal authentication API client for bounded identity and
-      self-revocation using the shared transport and error contracts.
+- [ ] Add the bounded identity endpoint adapter over the shared API transport
+      and generated wire types.
 - [ ] Send CLI name, version, runtime, and platform metadata without including
       key material in the user agent, URL, or diagnostics.
 - [ ] Add authorization-header redaction before errors, request diagnostics, or
@@ -188,8 +179,8 @@ unrecognized newer formats. It never writes beneath the current repository.
       unknown kinds or newer versions without rewriting them.
 - [ ] Implement the injected credential-store interface and production OS
       credential-store adapter.
-- [ ] Add literal tests for read, create, replace confirmation, delete,
-      unavailable store, locked store, and unknown-format behavior.
+- [ ] Add literal tests for read, create, replace confirmation, unavailable
+      store, locked store, and unknown-format behavior.
 - [ ] Implement the explicit user-level file fallback with platform paths,
       atomic replacement, permissions, ownership checks where available, and
       symlink rejection.
@@ -211,10 +202,6 @@ unrecognized newer formats. It never writes beneath the current repository.
       `TOUGHCROWD_API_KEY` for non-interactive execution.
 - [ ] Implement status with literal human output and a bounded stable JSON
       representation containing no key or verifier fields.
-- [ ] Implement stored-key logout with self-revocation, retry-safe local
-      deletion, unreachable-service warning, and web revocation URL.
-- [ ] Make logout refuse to alter local or remote credentials while an
-      environment key is selected.
 - [ ] Add command-level tests for stdout, stderr, exit codes, browser failure,
       hidden input, replacement, every credential source, origin isolation,
       API errors, cancellation, and redaction.
@@ -242,11 +229,6 @@ unrecognized newer formats. It never writes beneath the current repository.
 - Human and JSON status output identify only safe account, origin, source, key
   name, and expiration facts and return a nonzero exit for unauthenticated or
   invalid credentials.
-- Logout revokes and removes a stored key when possible, removes an invalid or
-  already revoked local key safely, and clearly reports when remote revocation
-  could not be confirmed.
-- Logout never revokes, persists, deletes, or otherwise modifies an environment
-  key or a hidden stored key bypassed by the environment.
 - Unknown credential formats fail safely without destructive rewrite or
   downgrade.
 - Keys never appear in stdout, stderr, errors, logs, test snapshots, process

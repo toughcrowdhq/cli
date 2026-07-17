@@ -349,10 +349,11 @@ independent top-level `agent`, `model`, or `provider` namespaces.
 
 ### `auth`
 
-Authentication operations likely include `login`, `status`, and `logout`.
-API keys are initially created and managed in the web application. If
-dogfooding demonstrates a need for terminal key lifecycle management, place it
-beneath `auth key` rather than introducing an unrelated top-level namespace.
+Initial authentication operations include `login` and `status`. API keys are
+created and managed in the web application. If dogfooding demonstrates a need
+for local credential removal or terminal key lifecycle management, add
+explicitly named operations beneath `auth` rather than assuming session-style
+logout semantics or introducing an unrelated top-level namespace.
 
 ### `integration`
 
@@ -451,16 +452,15 @@ The initial authentication command family is:
 ```sh
 toughcrowd auth login
 toughcrowd auth status
-toughcrowd auth logout
 ```
 
 `auth status` should report the API origin, authenticated identity, credential
 source, key name, and relevant expiration state without revealing credential
-material. When a stored credential is selected, `auth logout` removes that key
-and should attempt to revoke the same server-side key before deletion. It must
-still remove the local credential if network revocation fails and report the
-remaining remote key clearly. When an environment key is selected, logout must
-not read or modify a bypassed stored credential or revoke the environment key.
+material. The initial CLI does not expose logout, local credential removal, or
+key revocation. Re-running `auth login` may replace the stored credential only
+after explicit interactive confirmation. API-key lifecycle management,
+including revocation, remains in the web application until demonstrated CLI
+usage justifies additional commands.
 
 ### Initial API Key Authentication
 
@@ -558,8 +558,8 @@ TOUGHCROWD_API_KEY
   > authentication required
 ```
 
-When `TOUGHCROWD_API_KEY` is present, do not load, persist, revoke, or otherwise
-modify a stored API key. Changing `TOUGHCROWD_API_URL` must never send a stored
+When `TOUGHCROWD_API_KEY` is present, do not load, persist, or otherwise modify
+a stored API key. Changing `TOUGHCROWD_API_URL` must never send a stored
 production key to the override origin; use only a key stored for that exact
 canonical origin or the environment key supplied for the current invocation.
 

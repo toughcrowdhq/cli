@@ -411,6 +411,148 @@ Do not add these as top-level public nouns without a separate product decision:
   the systems that own it unless Tough Crowd later provides an independent
   management lifecycle.
 
+## Authentication And Configuration
+
+Keep authentication identity separate from project context:
+
+```text
+user or environment -> authentication identity
+working directory   -> repository and session defaults
+```
+
+A repository must never select the user's identity or cause a credential to be
+sent to a different service. Directory context may influence safe project
+defaults, but it must not influence authentication, credential storage, API or
+web origins, TLS behavior, or executable hooks.
+
+### Authentication Context
+
+Initially support one active human identity per canonical API origin. Do not
+select an identity based on the current directory, and do not add named-account
+or directory-to-account mappings in the first release.
+
+Store credentials keyed by canonical API origin so production and local
+development can coexist without sharing credentials:
+
+```text
+https://api.toughcrowd.com -> production credential
+http://localhost:3001     -> local-development credential
+```
+
+If multiple accounts per origin become necessary, add explicit account
+selection through `auth` commands. Do not call authentication accounts or
+contexts profiles because `profile` is the established Agent Profile resource.
+
+The initial authentication command family is:
+
+```sh
+toughcrowd auth login
+toughcrowd auth status
+toughcrowd auth logout
+```
+
+`auth status` should report the API origin, authenticated identity, credential
+source, and relevant expiration state without revealing credential material.
+`auth logout` must remove the local credential and revoke the corresponding
+server-side refresh session when possible.
+
+### Human And Automation Credentials
+
+Use browser-approved OAuth for human users. The normal login may use a loopback
+browser callback; offer device authorization for remote, SSH, and headless
+environments. The CLI is a public OAuth client and must not contain or depend on
+a confidential client secret.
+
+Human login uses a short-lived access token and a renewable refresh session.
+The server owns expiration and revocation policy; the initial policy target is:
+
+```text
+access token         1 hour
+refresh inactivity  30 days
+absolute login      90 days
+device code         10 minutes
+```
+
+Refresh access tokens automatically while the refresh session remains valid.
+Password or security events, administrative revocation, and logout must be able
+to revoke the refresh session.
+
+Use separately issued API tokens for CI and unattended automation. API tokens
+must be scoped, expiring, revocable, displayed only at creation, and stored
+hashed by the service. Supply them to the CLI through `TOUGHCROWD_TOKEN`; do not
+add a `--token` option that can leak through shell history or process listings.
+An environment token is runtime-only and must never be persisted automatically.
+
+### Credential Storage
+
+Use the operating-system credential store by default. If it is unavailable:
+
+- An interactive login may offer a permission-restricted user-level file
+  fallback after explaining the downgrade.
+- Non-interactive use must fail unless file storage was explicitly configured
+  or an environment token is present.
+- File storage must use platform-appropriate user data directories and the
+  strongest practical user-only permissions, including mode `0600` on Unix.
+- Credentials must never be written to a project directory or project config.
+
+Do not silently downgrade from the credential store to plaintext file storage.
+
+### Configuration Sources
+
+Resolve ordinary non-secret settings in this precedence order:
+
+```text
+command-line flag
+  > environment variable
+  > project configuration
+  > user configuration
+  > Git repository detection
+  > product default
+```
+
+The resolver should retain the winning source for each value so diagnostics and
+a future `config explain` command can make resolution understandable.
+
+Project configuration may be added when dogfooding demonstrates a need. When
+introduced, load it from the Git repository root and give it an explicit
+allow-list of safe settings such as:
+
+```text
+repository
+base branch
+Agent Profile
+```
+
+Project configuration must not set credentials, authentication identity, API
+or web origins, TLS settings, credential-storage behavior, or commands and
+hooks. Reject sensitive or unknown project keys rather than silently granting
+them authority.
+
+The initial environment contract is:
+
+```text
+TOUGHCROWD_TOKEN
+TOUGHCROWD_API_URL
+TOUGHCROWD_WEB_URL
+TOUGHCROWD_REPO
+TOUGHCROWD_AGENT_PROFILE
+NO_COLOR
+```
+
+Credential resolution is separate from ordinary configuration precedence:
+
+```text
+TOUGHCROWD_TOKEN
+  > stored credential for the resolved canonical API origin
+  > authentication required
+```
+
+When `TOUGHCROWD_TOKEN` is present, do not load, refresh, persist, or modify a
+stored OAuth credential. Changing `TOUGHCROWD_API_URL` must never send a stored
+production credential to the override origin; use only a credential stored for
+that exact canonical origin or the environment token supplied for the current
+invocation.
+
 ## Output Contracts
 
 - Human-readable output is the default.
@@ -428,7 +570,9 @@ Do not add these as top-level public nouns without a separate product decision:
 ## Deferred Decisions
 
 - The minimum command set for the first API-backed CLI release.
-- Public CLI authentication and credential-storage mechanics.
+- The exact public OAuth endpoints, client registration, API-token scope
+  taxonomy, and maximum API-token lifetimes.
+- The filename, format, and initial schema for optional project configuration.
 - Exact JSON and JSONL schemas and stable exit-code categories.
 - Whether dogfooding justifies any top-level shortcuts for session commands.
 - The scope and terminal framework for `toughcrowd ui`.

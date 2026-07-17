@@ -34,7 +34,8 @@ supported older line actually needs a release.
 1. A user-visible change adds a Changeset.
 2. `.github/workflows/cli-release-pr.yml` creates or updates the release PR.
 3. A maintainer reviews and merges the release PR.
-4. A release maintainer creates protected tag `v<version>` at that commit.
+4. A release maintainer runs `pnpm release`, which validates the release and
+   creates and pushes protected tag `v<version>` at that commit.
 5. `.github/workflows/publish-cli.yml` validates the tag and metadata, runs all
    checks, builds, packs, installs, and executes the exact tarball.
 6. The workflow publishes through npm Trusted Publishing and creates the

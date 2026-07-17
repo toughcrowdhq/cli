@@ -85,17 +85,19 @@ validation or cancellation leaves any existing credential unchanged.
 
 ### `auth status`
 
-Resolve the environment key first, otherwise the credential stored for the
-exact API origin, and validate the selected key. Human and JSON output contain
-only safe identity and credential metadata. Missing or invalid credentials are
-normal command failures, not unexpected exceptions.
+Resolve the environment key first, otherwise the stored credential for the
+resolved canonical API origin, and validate the selected key. Human and JSON
+output contain only safe identity and credential metadata. The command returns
+success only when the selected credential is valid; missing or invalid
+credentials produce a nonzero exit as normal command failures, not unexpected
+exceptions.
 
 ## Credential Boundary
 
 ```text
 TOUGHCROWD_API_KEY
-  > OS credential stored for the exact canonical API origin
-  > unauthenticated
+  > stored credential for the resolved canonical API origin
+  > authentication required
 ```
 
 Store a small tagged record so a future credential kind is never
@@ -155,6 +157,8 @@ and contain no secret material.
   environment variable and never silently writes a plaintext file.
 - `auth status` reports only bounded safe identity, origin, source, key name,
   and expiration information.
+- `auth status` exits successfully only for a valid selected credential and
+  exits nonzero when credentials are missing or invalid.
 - Unknown stored formats fail without destructive rewrite.
 - Keys never appear in arguments, options, URLs, stdout, stderr, errors,
   diagnostics, or tests.

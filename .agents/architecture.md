@@ -497,15 +497,18 @@ require reinterpreting API keys as OAuth refresh tokens.
 
 ### Credential Storage
 
-Use the operating-system credential store by default. If it is unavailable:
+Use the operating-system credential store for the initial implementation. If
+it is unavailable, interactive login must fail with actionable guidance to use
+`TOUGHCROWD_API_KEY`; the initial implementation does not provide file-backed
+credential storage.
 
-- An interactive login may offer a permission-restricted user-level file
-  fallback after explaining the downgrade.
-- Non-interactive use must fail unless file storage was explicitly configured
-  or an environment token is present.
-- File storage must use platform-appropriate user data directories and the
-  strongest practical user-only permissions, including mode `0600` on Unix.
-- Credentials must never be written to a project directory or project config.
+A later project may add a permission-restricted user-level file fallback if
+dogfooding demonstrates the need. If added, interactive login must explain the
+downgrade before offering it, non-interactive use must fail unless file storage
+was explicitly configured or an environment token is present, and file storage
+must use platform-appropriate user data directories with the strongest
+practical user-only permissions, including mode `0600` on Unix. Credentials
+must never be written to a project directory or project config.
 
 Do not silently downgrade from the credential store to plaintext file storage.
 

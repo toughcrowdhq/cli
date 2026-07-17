@@ -12,8 +12,6 @@ Read these files before making product or architecture changes:
 - `.agents/releasing.md` — versioning, release security, and first-publish
   rules.
 - `.agents/projects/README.md` — project workspace conventions.
-- `.agents/projects/cli-versioning-and-publishing/README.md` — active release
-  activation checklist.
 
 ## Product Thesis
 

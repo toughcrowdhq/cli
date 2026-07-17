@@ -3,8 +3,8 @@
 The public command-line client for Tough Crowd, which supervises coding-agent
 work in cloud sandboxes and helps people decide what is safe to ship.
 
-Version 0.1 is an intentionally small runnable scaffold. It prints
-`Hello, world!` while the public API-backed commands are developed.
+Version 0.1 provides the command foundation while the public API-backed
+commands are developed.
 
 ## Install
 
@@ -29,7 +29,13 @@ pnpm start
 Expected output:
 
 ```text
-Hello, world!
+Usage: toughcrowd [options]
+
+The command-line client for Tough Crowd
+
+Options:
+  -V, --version  output the version number
+  -h, --help     display help for command
 ```
 
 Print the package version with:

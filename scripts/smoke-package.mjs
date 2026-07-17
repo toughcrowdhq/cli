@@ -93,16 +93,29 @@ try {
   const versionOutput = execFileSync(executable, ["--version"], {
     encoding: "utf8",
   });
-  const greetingOutput = execFileSync(executable, [], { encoding: "utf8" });
+  const defaultOutput = execFileSync(executable, [], { encoding: "utf8" });
+  const helpOutput = execFileSync(executable, ["--help"], { encoding: "utf8" });
 
   assert(
     versionOutput === `${metadata.version}\n`,
     "installed CLI returned the wrong version",
   );
-  // Keep this release-contract assertion in sync with the default output in src/cli.ts.
+  // Keep this release-contract assertion in sync with the root help in src/cli.ts.
+  const rootHelp = `Usage: toughcrowd [options]
+
+The command-line client for Tough Crowd
+
+Options:
+  -V, --version  output the version number
+  -h, --help     display help for command
+`;
   assert(
-    greetingOutput === "Hello, world!\n",
-    "installed CLI returned the wrong greeting",
+    defaultOutput === rootHelp,
+    "installed CLI returned the wrong default help",
+  );
+  assert(
+    helpOutput === rootHelp,
+    "installed CLI returned the wrong --help output",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

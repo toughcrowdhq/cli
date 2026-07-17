@@ -54,34 +54,34 @@ implemented behavior exercises.
 
 ## Checklist
 
-- [ ] Add `commander` to runtime dependencies and commit the lockfile update.
-- [ ] Introduce the injected `CliRuntime` capabilities needed by the root
+- [x] Add `commander` to runtime dependencies and commit the lockfile update.
+- [x] Introduce the injected `CliRuntime` capabilities needed by the root
       command and process boundary.
-- [ ] Implement `runCli(args, runtime): Promise<number>` without reading global
+- [x] Implement `runCli(args, runtime): Promise<number>` without reading global
       process state or terminating the process.
-- [ ] Configure the Commander root name, description, version, help text, help
+- [x] Configure the Commander root name, description, version, help text, help
       destination, and exit override.
-- [ ] Make an empty argument list behave like root `--help` and return success.
-- [ ] Return exit code `0` for help and version and `2` for command-line usage
+- [x] Make an empty argument list behave like root `--help` and return success.
+- [x] Return exit code `0` for help and version and `2` for command-line usage
       errors.
-- [ ] Route ordinary results and help to stdout and usage diagnostics to
+- [x] Route ordinary results and help to stdout and usage diagnostics to
       stderr.
-- [ ] Reject unknown commands, unknown options, and excess arguments with
+- [x] Reject unknown commands, unknown options, and excess arguments with
       literal, tested diagnostics.
-- [ ] Keep `src/index.ts` limited to package-version loading, process streams,
+- [x] Keep `src/index.ts` limited to package-version loading, process streams,
       signal wiring, invoking `runCli`, and assigning `process.exitCode`.
-- [ ] Pass one `AbortSignal` through the runtime and map an observed process
+- [x] Pass one `AbortSignal` through the runtime and map an observed process
       interruption to exit code `130` without printing an internal stack
       trace.
-- [ ] Preserve concise diagnostics and exit code `1` for unexpected root-level
+- [x] Preserve concise diagnostics and exit code `1` for unexpected root-level
       failures while keeping stack traces out of normal user output.
-- [ ] Replace the existing greeting tests with literal assertions for root
+- [x] Replace the existing greeting tests with literal assertions for root
       help, `--help`, `--version`, usage errors, stdout, stderr, and exit codes.
-- [ ] Update the package smoke test to verify installed root help and version
+- [x] Update the package smoke test to verify installed root help and version
       behavior instead of `Hello, world!`.
-- [ ] Update public README examples that still describe the greeting scaffold.
-- [ ] Add a Changeset describing the new command foundation.
-- [ ] Run `pnpm format:check`, lint, typecheck, tests, build, and
+- [x] Update public README examples that still describe the greeting scaffold.
+- [x] Add a Changeset describing the new command foundation.
+- [x] Run `pnpm format:check`, lint, typecheck, tests, build, and
       installed-package smoke verification.
 
 ## Acceptance Criteria

@@ -553,6 +553,141 @@ production credential to the override origin; use only a credential stored for
 that exact canonical origin or the environment token supplied for the current
 invocation.
 
+## Project CLI Versions And Config Compatibility
+
+Separate a repository's CLI compatibility requirement from executable version
+selection:
+
+```text
+compatibility requirement -> says whether the running CLI may operate
+version selection         -> decides which CLI executable to launch
+```
+
+The Tough Crowd CLI may enforce a repository compatibility requirement, but it
+must not initially download or execute another CLI version automatically.
+
+### Initial Version-Pinning Model
+
+Use the Node package ecosystem for exact, reproducible project pins. A
+repository that needs a specific version should install an exact
+`@toughcrowd/cli` development dependency, commit its package-manager lockfile,
+and invoke the repository-local executable:
+
+```json
+{
+  "devDependencies": {
+    "@toughcrowd/cli": "0.2.4"
+  },
+  "scripts": {
+    "toughcrowd": "toughcrowd"
+  }
+}
+```
+
+```sh
+pnpm toughcrowd session list
+pnpm exec toughcrowd session new "Fix the flaky checkout test"
+```
+
+When project configuration is introduced, reserve a `requiredCliVersion`
+semantic-version constraint. It is a compatibility guard, not an installation
+or version-resolution instruction. An incompatible CLI must fail before
+loading credentials, making an API request, or mutating local or remote state,
+and should show the running version, required range, and an actionable command
+for invoking the repository-local version.
+
+Do not add transparent global-to-local re-execution. A user who invokes a local
+package through `pnpm`, `npm`, or another tool manager has explicitly selected
+repository code; an unrelated global executable must not silently make that
+trust decision for them.
+
+### Project Config Versioning
+
+Reserve these metadata fields in the first project-config schema:
+
+```text
+$schema
+schemaVersion
+requiredCliVersion
+```
+
+Apply these compatibility rules:
+
+- Anchor project configuration and its CLI requirement at the Git repository
+  root. Do not search above that root or select different CLI versions from
+  nested directories in the initial design.
+- A newer CLI should read every older schema version it still supports.
+- A CLI that encounters an unsupported newer `schemaVersion` must fail before
+  taking action instead of guessing at its meaning.
+- Treat unknown or disallowed project keys as validation errors with their
+  source location.
+- Additive fields may evolve within a schema only when their absence preserves
+  existing behavior. Breaking interpretation changes require a schema-version
+  increment.
+- Never rewrite committed project configuration automatically. Future
+  `config migrate` behavior must be explicit and produce an ordinary reviewable
+  Git diff; `config migrate --check` should be non-mutating.
+- A user override may choose a newer compatible executable, but it must not
+  weaken a repository's minimum compatibility constraint.
+
+The project config's sensitive-key restrictions remain invariant across schema
+versions. No schema version may grant a repository authority over credentials,
+authentication identity, service origins, TLS, credential storage, or
+executable paths and download sources.
+
+### Compatibility And Security Minimums
+
+Every API request should identify the CLI version and platform through a stable
+user agent. The service must be able to reject unsupported or known-vulnerable
+clients before accepting consequential operations.
+
+A repository version constraint cannot override a service security minimum or
+revoked release. Prerelease versions require explicit user selection. Publish a
+clear client support window before the public API begins rejecting otherwise
+valid older clients.
+
+### State Across CLI Versions
+
+Share only state that has an intentionally versioned, concurrency-safe format:
+
+```text
+shared across versions
+  credentials keyed by canonical API origin
+  user-level non-secret configuration
+
+versioned or disposable
+  caches
+  generated metadata
+  update state
+  transient session state
+```
+
+Credential storage needs its own format version plus atomic updates and locking
+so concurrent CLI versions cannot corrupt state or race refresh-token rotation.
+An older CLI must never downgrade or destructively rewrite a credential format
+it does not understand.
+
+### Future Version-Selecting Launcher
+
+Reconsider a Tough Crowd-managed launcher only if repository-local package
+invocation and external tool managers create demonstrated user friction. Such a
+launcher is a separate security-sensitive product boundary, not an extension of
+ordinary project-config loading.
+
+A future launcher would require a small stable toolchain manifest and must:
+
+- Resolve only official releases; project configuration may not provide an
+  executable path, registry, package source, or download URL.
+- Verify artifact signature and integrity before caching or execution.
+- Enforce security minimums and revoked versions before handing credentials to
+  the selected CLI.
+- Define deterministic range resolution, prerelease policy, offline behavior,
+  concurrent-download locking, platform selection, and cache cleanup.
+- Report both launcher and selected CLI versions in diagnostics.
+- Keep the toolchain manifest independently parseable from versioned product
+  configuration to avoid requiring a selected CLI to interpret the instruction
+  that selects it.
+
 ## Output Contracts
 
 - Human-readable output is the default.
@@ -573,6 +708,9 @@ invocation.
 - The exact public OAuth endpoints, client registration, API-token scope
   taxonomy, and maximum API-token lifetimes.
 - The filename, format, and initial schema for optional project configuration.
+- The public client support window and minimum-version enforcement policy.
+- Whether demonstrated usage ever justifies a Tough Crowd-managed
+  version-selecting launcher.
 - Exact JSON and JSONL schemas and stable exit-code categories.
 - Whether dogfooding justifies any top-level shortcuts for session commands.
 - The scope and terminal framework for `toughcrowd ui`.

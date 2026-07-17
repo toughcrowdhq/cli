@@ -2,129 +2,106 @@
 
 ## Goal
 
-Implement `toughcrowd auth login` and `auth status` using account-owned API
-keys, origin-scoped credential storage, and the `TOUGHCROWD_API_KEY`
-environment override.
+Implement `toughcrowd auth login` and `toughcrowd auth status` with an API key
+stored for one canonical API origin or supplied through
+`TOUGHCROWD_API_KEY`.
 
 ## Context
 
-The service displays an API key once and stores only its verifier. The CLI must
-let an interactive user paste that key without echoing it, validate it before
-storage, and retrieve it for later commands without placing it in command-line
-arguments, project files, logs, or ordinary output.
+The web application creates an account API key and displays it once. The CLI
+opens that page, reads the pasted key without echoing it, validates it, and
+stores it in the operating-system credential store.
 
-One active account is supported per canonical API origin. Production and local
-development credentials may coexist, but a key stored for one origin must
-never be sent to another. Environment keys are intentionally ephemeral and
-take complete precedence over stored credentials for the current process.
+Production and local-development credentials are isolated by canonical API
+origin. `TOUGHCROWD_API_KEY` is the simple non-interactive path and always
+takes precedence over stored credentials for the current process.
 
-The operating-system credential store is the default. An explicit
-permission-restricted file fallback is available for environments without a
-usable credential service, but the CLI never silently downgrades storage.
+The first implementation supports the secure primary path only. If the
+operating-system credential store is unavailable, interactive login fails with
+an actionable explanation; permission-restricted file storage can be added
+later if dogfooding shows it is needed.
 
 ## Dependencies
 
 This project depends on:
 
-- [`CLI Command Foundation`](../cli-command-foundation/README.md) for Commander
-  routing, `runCli`, injected runtime capabilities, output separation, exit
-  handling, and cancellation.
-- [`CLI API Client Foundation`](../cli-api-client-foundation/README.md) for
-  canonical API origins, generated wire types, shared HTTP transport,
-  structured errors, client metadata, retries, cancellation, and redaction.
-- The app repository's `API Key Authentication Service` project for API key
-  verification and bounded identity endpoints.
-- The app repository's `Shared Product API` project for the authenticated
-  principal, structured errors, request IDs, and supported client metadata.
+- [`CLI Command Foundation`](../cli-command-foundation/README.md) for Commander,
+  `runCli`, injected process capabilities, output separation, cancellation,
+  and tests.
+- [`CLI API Client Foundation`](../cli-api-client-foundation/README.md) for the
+  canonical API origin, handwritten JSON transport, structured errors, client
+  metadata, cancellation, and redaction.
+- The app repository's API-key authentication endpoints for validating a key
+  and returning bounded identity information.
 
-The later core session-command project depends on this project and the shared
-product session API.
+The first session commands depend on this project for credential resolution.
 
 ## Scope
 
-- Add the `auth login` and `auth status` command family.
-- Reuse the shared canonical API origin and resolve the web origin used by
-  authentication.
-- Read an API key through a hidden interactive prompt without accepting it as a
-  positional argument or command-line option.
-- Open the web API-key settings page when possible and always print a copyable
-  fallback URL.
-- Validate a submitted key against the resolved API origin before storing it.
-- Store one tagged, format-versioned API-key credential per canonical API
-  origin in the operating-system credential store.
-- Add an explicit permission-restricted user-level file fallback without
-  storing credentials in a repository.
-- Resolve `TOUGHCROWD_API_KEY` before stored credentials and keep environment
-  keys process-only.
-- Report safe identity, origin, credential source, key name, and expiration
-  information through `auth status`.
-- Add redaction, literal-output tests, and installed-package verification for
-  the authentication commands.
+- Add `toughcrowd auth login` and `toughcrowd auth status`.
+- Resolve and validate the API and web origins.
+- Open the web API-key page when possible and always print its URL.
+- Read the key through a hidden interactive prompt; never accept it in an
+  argument or option.
+- Handwrite the identity request and response types and runtime decoder.
+- Validate the key before storing it.
+- Store one format-tagged API-key credential per canonical API origin in the
+  operating-system credential store.
+- Resolve `TOUGHCROWD_API_KEY` before stored credentials and never persist an
+  environment key.
+- Confirm before replacing an existing stored key.
+- Report bounded identity, origin, credential source, key name, and expiration
+  without exposing the key.
+- Add literal command, origin-isolation, storage, cancellation, and redaction
+  tests.
 
 ## Out Of Scope
 
-- API key creation, listing, revocation, or expiration changes from the
-  terminal; those operations initially live in the web application.
-- Local credential removal. Re-running `auth login` may replace the stored key
-  only after explicit interactive confirmation.
-- OAuth, browser callbacks, device authorization, access-token refresh, or
-  multiple credential types beyond the format tag reserved for migration.
-- Password entry or browser-session cookie import.
-- Multiple accounts for one API origin or directory-selected identity.
-- Project configuration, repository detection, Agent Profile selection, or
-  session commands.
-- Persisting, refreshing, or otherwise modifying an API key supplied through
-  `TOUGHCROWD_API_KEY`.
-- A command-line `--api-key`, `--token`, or equivalent secret-bearing option.
-- Shell completion, update checks, telemetry, or a TUI.
+- Creating, listing, revoking, or changing API keys from the CLI.
+- OAuth, browser callbacks, device authorization, or token refresh.
+- Multiple accounts for one API origin.
+- Permission-restricted file credential storage. Use
+  `TOUGHCROWD_API_KEY` when the OS credential store is unavailable.
+- Local logout or credential removal.
+- API keys in command arguments, options, URLs, project files, visible prompts,
+  logs, or ordinary output.
+- Project configuration, repository detection, Agent Profile selection,
+  session commands, telemetry, or a TUI.
 
 ## Command Behavior
 
 ### `auth login`
 
-`auth login` is interactive and requires a TTY unless a future explicit secure
-input mechanism is approved. It:
+1. Resolve the canonical API and web origins.
+2. Open and print the web API-key page.
+3. Read a key through a hidden TTY prompt.
+4. Validate it with the handwritten identity API operation.
+5. Confirm replacement when a stored credential already exists.
+6. Store it only after validation and confirmation succeed.
+7. Print the safe authenticated identity and origin.
 
-1. Resolves and canonicalizes the API and web origins.
-2. Opens the web API-key settings page when browser launching is available.
-3. Prints the same HTTPS URL so the flow works when automatic opening fails.
-4. Reads the complete key through a hidden prompt.
-5. Validates the key and reads its bounded identity from the API origin.
-6. Stores the tagged credential only after validation succeeds.
-7. Prints the authenticated account, API origin, key name, expiration, and
-   storage backend without printing the key.
-
-If a stored credential already exists, login must not overwrite it without an
-explicit interactive confirmation. A failed validation leaves the existing
-credential unchanged.
+Non-TTY login fails with guidance to use `TOUGHCROWD_API_KEY`. Failed
+validation or cancellation leaves any existing credential unchanged.
 
 ### `auth status`
 
-`auth status` applies normal credential precedence and validates the selected
-key. Human output identifies the API origin, account, source (`environment`,
-`credential-store`, or `file`), key name, and expiration. JSON output returns a
-bounded documented object containing the same safe facts.
+Resolve the environment key first, otherwise the stored credential for the
+resolved canonical API origin, and validate the selected key. Human and JSON
+output contain only safe identity and credential metadata. The command returns
+success only when the selected credential is valid; missing or invalid
+credentials produce a nonzero exit as normal command failures, not unexpected
+exceptions.
 
-No credential is a normal unauthenticated state, not an internal exception.
-The command returns success only when the selected credential is valid.
-
-## Credential Resolution And Storage
-
-Credential resolution is:
+## Credential Boundary
 
 ```text
 TOUGHCROWD_API_KEY
-  > stored credential for the exact canonical API origin
-  > unauthenticated
+  > stored credential for the resolved canonical API origin
+  > authentication required
 ```
 
-Canonical origins include scheme, lowercase host, and non-default port. They
-exclude user info, query, fragment, and resource paths. Production requires
-HTTPS. Plain HTTP is allowed only for loopback local development. The resolver
-must reject deceptive or unsupported origins rather than normalizing them into
-an allowed destination.
-
-The stored secret uses an envelope such as:
+Store a small tagged record so a future credential kind is never
+misinterpreted as an API key:
 
 ```text
 formatVersion: 1
@@ -133,107 +110,59 @@ apiOrigin: <canonical origin>
 apiKey: <secret>
 ```
 
-The storage service and account key are derived deterministically from the
-canonical origin without placing secret material in identifiers. Unknown
-format versions or credential kinds fail safely and are never rewritten by an
-older CLI.
-
-The OS credential service is the default. The implementation dependency must
-be evaluated for current Node support, macOS Keychain, Windows Credential
-Manager, Linux Secret Service behavior, prebuilt artifact availability,
-package provenance, startup cost, and future standalone packaging.
-
-The file fallback requires explicit selection after a visible warning. It uses
-the platform-appropriate user data directory, creates parent directories with
-user-only access, writes atomically, uses mode `0600` on Unix, rejects unsafe
-symlinks and unexpected ownership where the platform exposes it, and preserves
-unrecognized newer formats. It never writes beneath the current repository.
+Unknown kinds or newer formats fail safely and are not rewritten. Credential
+store service and account identifiers are derived from the canonical origin
+and contain no secret material.
 
 ## Checklist
 
-### Phase 1 — Authentication And Origin Boundaries
-
-- [ ] Add the `auth` namespace and `login` and `status` Commander adapters over
-      framework-independent authentication operations.
-- [ ] Reuse the shared canonical API-origin value and define the corresponding
-      web origin with literal valid, invalid, and deceptive-input tests.
-- [ ] Add the API-key credential resolver with environment-before-storage
-      precedence and source metadata.
-- [ ] Add the bounded identity endpoint adapter over the shared API transport
-      and generated wire types.
-- [ ] Send CLI name, version, runtime, and platform metadata without including
-      key material in the user agent, URL, or diagnostics.
-- [ ] Add authorization-header redaction before errors, request diagnostics, or
-      injected logging can observe request details.
-- [ ] Define literal success, unauthenticated, invalid-key, expired-key,
-      revoked-key, unreachable-service, and interrupted exit behavior.
-- [ ] Verify that an API URL override never loads or sends a key stored for a
-      different canonical origin.
-
-### Phase 2 — Credential Storage
-
-- [ ] Evaluate and record the operating-system credential-store dependency
-      against supported platforms, Node versions, package provenance, and
-      distribution constraints.
-- [ ] Define the tagged, format-versioned stored credential envelope and reject
-      unknown kinds or newer versions without rewriting them.
-- [ ] Implement the injected credential-store interface and production OS
-      credential-store adapter.
-- [ ] Add literal tests for read, create, replace confirmation, unavailable
-      store, locked store, and unknown-format behavior.
-- [ ] Implement the explicit user-level file fallback with platform paths,
-      atomic replacement, permissions, ownership checks where available, and
-      symlink rejection.
-- [ ] Test the file fallback against real disposable directories and literal
-      modes and contents rather than mocking filesystem operations.
-- [ ] Ensure concurrent CLI processes cannot truncate, partially replace, or
-      silently downgrade the same stored credential.
-- [ ] Ensure storage errors never include the submitted key or serialized
-      credential envelope in their messages.
-
-### Phase 3 — Authentication Commands
-
-- [ ] Add an injected hidden-input capability that restores terminal state on
-      success, validation failure, cancellation, `SIGINT`, and `SIGTERM`.
-- [ ] Implement interactive login with browser opening, fallback URL, hidden
-      input, remote validation, safe replacement confirmation, and storage only
-      after success.
-- [ ] Reject non-TTY login with an actionable instruction to use
-      `TOUGHCROWD_API_KEY` for non-interactive execution.
-- [ ] Implement status with literal human output and a bounded stable JSON
-      representation containing no key or verifier fields.
-- [ ] Add command-level tests for stdout, stderr, exit codes, browser failure,
-      hidden input, replacement, every credential source, origin isolation,
-      API errors, cancellation, and redaction.
-- [ ] Update public README authentication examples and environment-variable
-      documentation using `TOUGHCROWD_API_KEY` exclusively.
-- [ ] Add a Changeset for the authentication command family and public
-      environment contract.
-- [ ] Update installed-package smoke verification with a deterministic
-      unauthenticated status check that does not access real user credentials.
+- [ ] Add the `auth` namespace with thin `login` and `status` Commander
+      adapters over ordinary authentication functions.
+- [ ] Resolve the API and web origins and test production, loopback, override,
+      and deceptive inputs literally.
+- [ ] Add environment-before-storage credential resolution for the exact API
+      origin, retaining only safe source metadata.
+- [ ] Choose an operating-system credential-store dependency that supports the
+      package's Node and platform targets.
+- [ ] Implement the small format-tagged stored credential record and reject
+      unknown kinds and newer versions without rewriting them.
+- [ ] Add an injected credential-store boundary so tests never access the
+      developer's real credentials.
+- [ ] Add the handwritten identity API operation and runtime response decoder.
+- [ ] Define literal behavior for valid, missing, invalid, expired, and revoked
+      keys plus network failure and cancellation.
+- [ ] Add hidden TTY input that restores terminal state after success, failure,
+      cancellation, `SIGINT`, and `SIGTERM`.
+- [ ] Implement login with browser opening, printed fallback URL, hidden input,
+      validation, replacement confirmation, and store-after-success behavior.
+- [ ] Implement status with concise human output and bounded JSON output.
+- [ ] Verify that changing the API origin never loads or sends a credential
+      stored for another origin.
+- [ ] Add adversarial command tests proving keys do not appear in stdout,
+      stderr, errors, diagnostics, or package-smoke output.
+- [ ] Update README authentication and `TOUGHCROWD_API_KEY` documentation.
+- [ ] Add a Changeset and a deterministic installed-package authentication
+      smoke check.
 - [ ] Run formatting, lint, typecheck, tests, build, and installed-package smoke
       verification.
 
 ## Acceptance Criteria
 
-- `auth login` accepts a key only through a hidden TTY prompt, validates it
-  against the selected API origin, and never stores an invalid key.
-- No command accepts an API key in an argument, option, URL, project file, or
-  ordinary visible prompt.
-- Production uses the operating-system credential store unless the user
-  explicitly accepts the permission-restricted file fallback.
-- Production and local-development credentials coexist without either key ever
-  being sent to the other's origin.
-- `TOUGHCROWD_API_KEY` completely bypasses stored credential reads and remains
-  process-only.
-- Human and JSON status output identify only safe account, origin, source, key
-  name, and expiration facts and return a nonzero exit for unauthenticated or
-  invalid credentials.
-- Unknown credential formats fail safely without destructive rewrite or
-  downgrade.
-- Keys never appear in stdout, stderr, errors, logs, test snapshots, process
-  arguments, environment diagnostics, or package-smoke output.
-- Literal command tests exercise repeated `runCli` calls without global process
-  mutation or access to the developer's real credential store.
-- The packed package exposes only `toughcrowd`, and formatting, lint, typecheck,
-  tests, build, and installed-package smoke verification pass.
+- `auth login` reads a key only through a hidden TTY prompt, validates it, and
+  stores it only after successful validation and any required replacement
+  confirmation.
+- `TOUGHCROWD_API_KEY` bypasses stored credential reads and is never persisted.
+- Stored credentials are selected only by exact canonical API origin.
+- An unavailable OS credential store produces actionable guidance to use the
+  environment variable and never silently writes a plaintext file.
+- `auth status` reports only bounded safe identity, origin, source, key name,
+  and expiration information.
+- `auth status` exits successfully only for a valid selected credential and
+  exits nonzero when credentials are missing or invalid.
+- Unknown stored formats fail without destructive rewrite.
+- Keys never appear in arguments, options, URLs, stdout, stderr, errors,
+  diagnostics, or tests.
+- Tests exercise repeated `runCli` calls without global process mutation,
+  network access, or the developer's credential store.
+- Formatting, lint, typecheck, tests, build, and installed-package smoke
+  verification pass.

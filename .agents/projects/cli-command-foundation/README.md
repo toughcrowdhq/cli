@@ -81,8 +81,8 @@ implemented behavior exercises.
       behavior instead of `Hello, world!`.
 - [ ] Update public README examples that still describe the greeting scaffold.
 - [ ] Add a Changeset describing the new command foundation.
-- [ ] Run formatting, lint, typecheck, tests, build, and installed-package smoke
-      verification.
+- [ ] Run `pnpm format:check`, lint, typecheck, tests, build, and
+      installed-package smoke verification.
 
 ## Acceptance Criteria
 

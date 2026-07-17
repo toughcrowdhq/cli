@@ -65,11 +65,13 @@ Build one executable with distinct presentation modes over the same API client
 and session event model:
 
 ```text
-commands -> application operations -> public REST and SSE APIs
-                         |
-                         +-> human output
-                         +-> JSON or JSONL output
-                         +-> future TUI
+commands
+  -> application operations
+    -> public REST and SSE APIs
+  -> selected presentation
+    -> human output
+    -> JSON or JSONL output
+    -> future TUI
 ```
 
 Ship the command interface and inline session streaming before a full-screen
@@ -202,7 +204,7 @@ process entry point
   -> Commander command definitions
     -> typed application operations
       -> public API client and session event source
-        -> human, JSON, JSONL, or future TUI presentation
+    -> selected human, JSON, JSONL, or future TUI presentation
 ```
 
 Command actions must translate parsed arguments and options into ordinary typed

@@ -456,10 +456,11 @@ toughcrowd auth logout
 
 `auth status` should report the API origin, authenticated identity, credential
 source, key name, and relevant expiration state without revealing credential
-material. `auth logout` removes the locally stored key and should attempt to
-revoke that same server-side key before deletion. It must still remove the
-local credential if network revocation fails and report the remaining remote
-key clearly. It must never revoke a key supplied only through the environment.
+material. When a stored credential is selected, `auth logout` removes that key
+and should attempt to revoke the same server-side key before deletion. It must
+still remove the local credential if network revocation fails and report the
+remaining remote key clearly. When an environment key is selected, logout must
+not read or modify a bypassed stored credential or revoke the environment key.
 
 ### Initial API Key Authentication
 

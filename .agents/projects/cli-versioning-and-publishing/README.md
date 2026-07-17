@@ -16,6 +16,19 @@ exist. The first `0.1.0` publish is therefore a one-time interactive bootstrap
 from the exact local release tag using a maintainer account with 2FA. Every
 later release publishes through OIDC.
 
+External protections must reflect the actual maintainer count. A solo
+maintainer may be the only npm organization owner when the account uses 2FA and
+has securely stored recovery methods. Do not create a fake or shared account to
+satisfy a nominal owner count. While the project has one maintainer, the
+`npm-production` environment restricts deployments to `v*` tags without an
+impossible second-person review. Add a required reviewer and prevent self-review
+when a second trusted release maintainer exists.
+
+The long-term supported-release policy lives in `.agents/releasing.md`. The
+initial automation intentionally supports the current stable line on `latest`
+and prereleases on `next`; maintenance-line automation is activated only when a
+supported older line actually needs a release.
+
 ## Release Flow
 
 1. A user-visible change adds a Changeset.
@@ -53,6 +66,7 @@ later release publishes through OIDC.
 - Validate tag, metadata, dist-tag, and tarball contents.
 - Verify the installed executable.
 - Document external activation settings.
+- Document stable, prerelease, and future maintenance-line policy.
 
 ## Out Of Scope
 
@@ -61,6 +75,8 @@ later release publishes through OIDC.
 - Registering the npm Trusted Publisher.
 - Publishing the first release.
 - Adding standalone binaries or non-npm distribution channels.
+- Implementing maintenance-branch automation before a maintenance release is
+  needed.
 
 ## Checklist
 
@@ -72,13 +88,16 @@ later release publishes through OIDC.
 - [x] Add strict tag, metadata, and dist-tag validation.
 - [x] Add npm tarball and installed-binary verification.
 - [x] Add the Apache-2.0 license and public repository metadata.
-- [ ] Create or confirm the `@toughcrowd` npm organization with at least two
-      owners using 2FA.
-- [ ] Enable GitHub Actions to create pull requests.
-- [ ] Enable private vulnerability reporting for the public repository.
-- [ ] Create GitHub environment `npm-production`, require a maintainer reviewer,
-      prevent self-review, and restrict deployments to `v*` tags.
-- [ ] Create an active tag ruleset for `v*` that restricts creation, update, and
+- [ ] Create or confirm the `@toughcrowd` npm organization, require 2FA for all
+      owners, and securely store account recovery methods. One real owner is
+      acceptable while the company has one maintainer; never add a fake or
+      shared owner.
+- [x] Enable GitHub Actions to create pull requests.
+- [x] Enable private vulnerability reporting for the public repository.
+- [x] Create GitHub environment `npm-production` and restrict deployments to
+      `v*` tags. While there is one maintainer, do not require a reviewer; when
+      a second trusted maintainer exists, require review and prevent self-review.
+- [x] Create an active tag ruleset for `v*` that restricts creation, update, and
       deletion to release maintainers.
 - [ ] Remove `private: true` after the external protections are complete.
 - [ ] Create local tag `v0.1.0`, verify its exact artifact, and publish
@@ -96,7 +115,9 @@ later release publishes through OIDC.
 - A release tag that differs from `package.json` fails before npm access.
 - A private, unlicensed, or incorrectly attributed package fails before npm
   access.
-- Stable versions resolve to `latest`; prereleases resolve to `next`.
+- Current-line stable versions resolve to `latest`; prereleases resolve to
+  `next`; a future older-line maintenance release must use an explicit
+  `maintenance-<major>` tag and must not move `latest` backward.
 - The tarball contains only expected package files and compiled output.
 - Installing the tarball exposes only `toughcrowd` and reports the exact
   package version.

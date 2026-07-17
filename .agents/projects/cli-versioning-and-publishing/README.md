@@ -99,7 +99,7 @@ supported older line actually needs a release.
       a second trusted maintainer exists, require review and prevent self-review.
 - [x] Create an active tag ruleset for `v*` that restricts creation, update, and
       deletion to release maintainers.
-- [ ] Remove `private: true` after the external protections are complete.
+- [x] Remove `private: true` after the external protections are complete.
 - [ ] Create local tag `v0.1.0`, verify its exact artifact, and publish
       `@toughcrowd/cli@0.1.0` interactively with maintainer 2FA.
 - [ ] Register `publish-cli.yml` as the npm Trusted Publisher for

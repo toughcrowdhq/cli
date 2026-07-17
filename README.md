@@ -55,8 +55,8 @@ does not install `crowd` as an alias.
 
 CLI releases use Changesets, protected `v<version>` Git tags, and npm Trusted
 Publishing with GitHub OIDC. See
-[`.agents/projects/cli-versioning-and-publishing/README.md`](.agents/projects/cli-versioning-and-publishing/README.md)
-for the activation checklist and first-release bootstrap.
+[`.agents/releasing.md`](.agents/releasing.md)
+for the release policy and first-release bootstrap notes.
 
 ## Architecture boundary
 

@@ -38,7 +38,9 @@ export function validateReleaseWorkspace({
 }
 
 export function hasChangelogEntry(changelog, version) {
-  return changelog.split("\n").includes(`## ${version}`);
+  return changelog
+    .split("\n")
+    .some((line) => line.trimEnd() === `## ${version}`);
 }
 
 async function run() {
@@ -60,6 +62,10 @@ async function run() {
   assert(
     hasChangelogEntry(changelog, metadata.version),
     `CHANGELOG.md has no ${metadata.version} release entry`,
+  );
+  assert(
+    process.stdin.isTTY && process.stdout.isTTY,
+    "release confirmation requires an interactive terminal",
   );
 
   runGit(["fetch", "--quiet", "origin", "main"]);
@@ -89,19 +95,19 @@ async function run() {
     execFileSync(command, args, { cwd: packageDirectory, stdio: "inherit" });
   }
 
-  assert(
-    process.stdin.isTTY && process.stdout.isTTY,
-    "release confirmation requires an interactive terminal",
-  );
   const shortHead = gitOutput(["rev-parse", "--short", "HEAD"]);
   const prompt = createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-  const answer = await prompt.question(
-    `Push ${tag} for @toughcrowd/cli@${metadata.version} from ${shortHead}? [y/N] `,
-  );
-  prompt.close();
+  let answer;
+  try {
+    answer = await prompt.question(
+      `Push ${tag} for @toughcrowd/cli@${metadata.version} from ${shortHead}? [y/N] `,
+    );
+  } finally {
+    prompt.close();
+  }
   assert(
     ["y", "yes"].includes(answer.trim().toLowerCase()),
     "release cancelled",

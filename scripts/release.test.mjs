@@ -53,6 +53,9 @@ describe("release workspace policy", () => {
 
   it("requires a changelog heading for the package version", () => {
     expect(hasChangelogEntry("# Changelog\n\n## 0.1.1\n", "0.1.1")).toBe(true);
+    expect(hasChangelogEntry("# Changelog\r\n\r\n## 0.1.1\r\n", "0.1.1")).toBe(
+      true,
+    );
     expect(hasChangelogEntry("# Changelog\n\n## 0.1.0\n", "0.1.1")).toBe(false);
   });
 });

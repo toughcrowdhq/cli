@@ -113,28 +113,28 @@ when the implementation is clearer with fewer modules.
 
 ## Checklist
 
-- [ ] Define and test canonical production and loopback API origins, including
+- [x] Define and test canonical production and loopback API origins, including
       deceptive invalid inputs.
-- [ ] Add the minimal injected fetch and timeout capabilities needed by API
+- [x] Add the minimal injected fetch and timeout capabilities needed by API
       tests.
-- [ ] Implement the handwritten JSON request helper with relative paths,
+- [x] Implement the handwritten JSON request helper with relative paths,
       authorization, stable client metadata, request IDs, and optional
       idempotency keys.
-- [ ] Require an operation-provided runtime decoder and reject unexpected
+- [x] Require an operation-provided runtime decoder and reject unexpected
       content types, invalid JSON, and incompatible success bodies.
-- [ ] Parse the supported structured API error envelope into one bounded,
+- [x] Parse the supported structured API error envelope into one bounded,
       credential-safe error shape.
-- [ ] Map network failure, timeout, cancellation, and malformed responses to
+- [x] Map network failure, timeout, cancellation, and malformed responses to
       literal tested failure kinds.
-- [ ] Reject or safely handle redirects without sending authorization to a
+- [x] Reject or safely handle redirects without sending authorization to a
       different origin.
-- [ ] Add adversarial tests proving API keys and authorization headers never
+- [x] Add adversarial tests proving API keys and authorization headers never
       appear in errors or diagnostics.
-- [ ] Document how a new API operation adds handwritten types and a decoder
+- [x] Document how a new API operation adds handwritten types and a decoder
       from the app's supported API contract.
-- [ ] Add a Changeset when the client first becomes part of packaged command
+- [x] Add a Changeset when the client first becomes part of packaged command
       behavior.
-- [ ] Run formatting, lint, typecheck, tests, build, and installed-package smoke
+- [x] Run formatting, lint, typecheck, tests, build, and installed-package smoke
       verification.
 
 ## Acceptance Criteria

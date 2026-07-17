@@ -31,9 +31,10 @@ The CLI is a thin client of Tough Crowd's public API.
 It may depend on:
 
 - Public HTTP endpoints.
-- Public OpenAPI contracts.
-- A generated client committed to this repository.
-- A separately versioned public API client package.
+- Public API documentation and OpenAPI contracts as implementation references.
+- Handwritten request and response types for operations the CLI implements.
+- A separately versioned public API client package only when another supported
+  consumer justifies one.
 
 It must not depend on:
 

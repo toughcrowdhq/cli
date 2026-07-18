@@ -1,13 +1,20 @@
 import { Command, CommanderError } from "commander";
 import { openUrl as defaultOpenUrl } from "./browser.js";
 import { login, status, type AuthRuntime } from "./auth/commands.js";
-import type { FetchLike } from "./api/request.js";
+import type { FetchLike, TimerCapabilities } from "./api/request.js";
 import {
   createKeyringCredentialStore,
   type CredentialStore,
 } from "./auth/credentials.js";
 import { AuthCommandError } from "./auth/errors.js";
-import { createTerminalPrompt, type HiddenPrompt } from "./auth/prompt.js";
+import {
+  bindLoopbackListener,
+  type LoopbackListenerFactory,
+} from "./auth/loopback.js";
+import {
+  createAuthorizationSecrets,
+  type AuthorizationSecrets,
+} from "./auth/pkce.js";
 
 export interface CliWritable {
   write(value: string): unknown;
@@ -19,10 +26,11 @@ export interface CliRuntime {
   version: string;
   signal: AbortSignal;
   env?: NodeJS.ProcessEnv;
-  stdin?: NodeJS.ReadStream;
   fetch?: FetchLike;
+  timers?: TimerCapabilities;
   credentialStore?: CredentialStore;
-  prompt?: HiddenPrompt;
+  createAuthorizationSecrets?(): AuthorizationSecrets;
+  bindLoopbackListener?: LoopbackListenerFactory;
   openUrl?(url: string): Promise<boolean>;
 }
 
@@ -106,7 +114,7 @@ function createRootProgram(runtime: CliRuntime): Command {
 
 function createAuthLoginCommand(runtime: CliRuntime): Command {
   return new Command("login")
-    .description("Authenticate with a Tough Crowd API key")
+    .description("Authenticate through browser approval")
     .allowExcessArguments(false)
     .allowUnknownOption(false)
     .action(async () => {
@@ -133,10 +141,16 @@ function createAuthRuntime(runtime: CliRuntime): AuthRuntime {
     signal: runtime.signal,
     env: runtime.env,
     fetch: runtime.fetch,
+    timers: runtime.timers,
     credentialStore: runtime.credentialStore ?? createKeyringCredentialStore(),
-    prompt:
-      runtime.prompt ??
-      createTerminalPrompt(runtime.stdin ?? process.stdin, runtime.stderr),
+    createAuthorizationSecrets: () =>
+      runtime.createAuthorizationSecrets != null
+        ? runtime.createAuthorizationSecrets()
+        : createAuthorizationSecrets(),
+    bindLoopbackListener: (options) =>
+      runtime.bindLoopbackListener != null
+        ? runtime.bindLoopbackListener(options)
+        : bindLoopbackListener(options),
     openUrl: (url) =>
       runtime.openUrl != null ? runtime.openUrl(url) : defaultOpenUrl(url),
   };

@@ -78,6 +78,35 @@ describe("requestJson", () => {
     });
   });
 
+  it("omits authorization for public API operations", async () => {
+    const fetch = createFetch(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await requestJson({
+      method: "POST",
+      path: "/api/cli-authorizations",
+      body: { state: "public-request" },
+      requestId: "req_cli_public",
+      fetch,
+      timers: immediateTimers,
+      metadata: stableMetadata,
+      decode: decodeOkResponse,
+    });
+
+    expect(readHeaders(fetch.calls[0].init.headers)).toEqual({
+      accept: "application/json",
+      "content-type": "application/json",
+      "user-agent": "@toughcrowd/cli/1.2.3 node/22.14.0 linux/x64",
+      "x-request-id": "req_cli_public",
+      "x-toughcrowd-client": "@toughcrowd/cli/1.2.3",
+      "x-toughcrowd-runtime": "node/22.14.0; linux; x64",
+    });
+  });
+
   it.each([
     ["/v1/example"],
     ["https://evil.test/api/example"],
@@ -243,6 +272,52 @@ describe("requestJson", () => {
     });
     expect(JSON.stringify(error)).not.toContain("server-secret");
     expect(String(error.stack)).not.toContain("server-secret");
+  });
+
+  it("parses the supported product error envelope", async () => {
+    const error = await captureApiClientError(
+      requestJson({
+        method: "POST",
+        path: "/api/cli-authorizations/exchange",
+        fetch: createFetch(
+          new Response(
+            JSON.stringify({
+              error: {
+                code: "authorization-denied",
+                message: "Authorization code is invalid.",
+                requestId: "req_product_api",
+                details: [
+                  {
+                    field: "code",
+                    message: "Authorization code is invalid.",
+                  },
+                ],
+              },
+            }),
+            {
+              status: 403,
+              headers: { "content-type": "application/json" },
+            },
+          ),
+        ),
+        timers: immediateTimers,
+        decode: decodeOkResponse,
+      }),
+    );
+
+    expect(error).toMatchObject({
+      kind: "api",
+      status: 403,
+      code: "authorization-denied",
+      message: "Authorization code is invalid.",
+      requestId: "req_product_api",
+      fields: [
+        {
+          field: "code",
+          message: "Authorization code is invalid.",
+        },
+      ],
+    });
   });
 
   it("maps malformed API error envelopes to malformed-response", async () => {

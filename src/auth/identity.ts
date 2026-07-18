@@ -3,17 +3,13 @@ import { requestJson, type RequestJsonOptions } from "../api/request.js";
 export interface AuthIdentity {
   user: {
     id: string;
-    email?: string;
-    name?: string;
-  };
-  account?: {
-    id: string;
-    name?: string;
+    email: string;
+    name: string;
   };
   key: {
-    id?: string;
-    name?: string;
-    expiresAt?: string | null;
+    id: string;
+    name: string;
+    createdAt: string;
   };
 }
 
@@ -32,7 +28,7 @@ export async function validateApiKey(
   return requestJson({
     origin: options.apiOrigin,
     method: "GET",
-    path: "/api/cli/auth/identity",
+    path: "/api/me",
     authorization: `Bearer ${options.apiKey}`,
     signal: options.signal,
     fetch: options.fetch,
@@ -43,86 +39,70 @@ export async function validateApiKey(
 }
 
 export function decodeAuthIdentity(value: unknown): AuthIdentity {
-  if (!isRecord(value) || !isRecord(value.user) || !isRecord(value.key)) {
-    throw new TypeError("identity response must contain user and key");
+  if (
+    !isRecord(value) ||
+    value.authenticated !== true ||
+    !isRecord(value.user) ||
+    !isRecord(value.impersonation) ||
+    !isRecord(value.credential)
+  ) {
+    throw new TypeError("identity response must contain API-key identity");
   }
 
   const userId = readBoundedString(value.user.id, 120);
-  if (userId == null) throw new TypeError("identity user id is required");
+  const userEmail = readBoundedString(value.user.email, 320);
+  const userName = readBoundedString(value.user.name, 200);
+  const userRole = value.user.role;
+  if (
+    userId == null ||
+    userEmail == null ||
+    userName == null ||
+    (userRole !== "user" && userRole !== "admin")
+  ) {
+    throw new TypeError("identity user is invalid");
+  }
 
-  const account = decodeOptionalAccount(value.account);
-  if (account === undefined) throw new TypeError("identity account is invalid");
-
-  const key = decodeKey(value.key);
+  if (
+    value.impersonation.isImpersonating !== false ||
+    value.impersonation.impersonatedBy !== null
+  ) {
+    throw new TypeError("API-key identity cannot be impersonated");
+  }
 
   return {
     user: {
       id: userId,
-      ...readOptionalProperty(value.user.email, "email", 320),
-      ...readOptionalProperty(value.user.name, "name", 200),
+      email: userEmail,
+      name: userName,
     },
-    ...(account != null ? { account } : {}),
-    key,
-  };
-}
-
-function decodeOptionalAccount(
-  value: unknown,
-): AuthIdentity["account"] | null | undefined {
-  if (value == null) return null;
-  if (!isRecord(value)) return undefined;
-
-  const id = readBoundedString(value.id, 120);
-  if (id == null) return undefined;
-
-  return {
-    id,
-    ...readOptionalProperty(value.name, "name", 200),
+    key: decodeKey(value.credential),
   };
 }
 
 function decodeKey(value: Record<string, unknown>): AuthIdentity["key"] {
-  const id = readOptionalBoundedString(value.id, 120);
-  const name = readOptionalBoundedString(value.name, 200);
-  const expiresAt = readOptionalNullableString(value.expiresAt, 80);
-  if (id === undefined || name === undefined || expiresAt === undefined) {
+  const id = readBoundedString(value.id, 120);
+  const name = readBoundedString(value.name, 200);
+  const createdAt = readIsoTimestamp(value.createdAt);
+  if (
+    value.type !== "api-key" ||
+    id == null ||
+    name == null ||
+    createdAt == null
+  ) {
     throw new TypeError("identity key is invalid");
   }
 
-  return {
-    ...(id != null ? { id } : {}),
-    ...(name != null ? { name } : {}),
-    ...(expiresAt != null ? { expiresAt } : {}),
-  };
+  return { id, name, createdAt };
 }
 
-function readOptionalProperty<const K extends string>(
-  value: unknown,
-  key: K,
-  maxLength: number,
-): { readonly [P in K]?: string } {
-  const text = readOptionalBoundedString(value, maxLength);
-  if (text == null) return {};
+function readIsoTimestamp(value: unknown): string | null {
+  const text = readBoundedString(value, 80);
+  if (text == null) return null;
 
-  return { [key]: text } as { readonly [P in K]?: string };
-}
+  const timestamp = Date.parse(text);
+  if (!Number.isFinite(timestamp)) return null;
 
-function readOptionalNullableString(
-  value: unknown,
-  maxLength: number,
-): string | null | undefined {
-  if (value == null) return null;
-
-  return readBoundedString(value, maxLength) ?? undefined;
-}
-
-function readOptionalBoundedString(
-  value: unknown,
-  maxLength: number,
-): string | null | undefined {
-  if (value == null) return null;
-
-  return readBoundedString(value, maxLength) ?? undefined;
+  return new Date(timestamp).toISOString() === text ? text : null;
 }
 
 function readBoundedString(value: unknown, maxLength: number): string | null {

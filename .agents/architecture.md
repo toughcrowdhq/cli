@@ -456,12 +456,11 @@ toughcrowd auth status
 ```
 
 `auth status` should report the API origin, authenticated identity, credential
-source, key name, and relevant expiration state without revealing credential
-material. The initial CLI does not expose logout, local credential removal, or
-key revocation. Re-running `auth login` may replace the stored credential only
-after explicit interactive confirmation. API-key lifecycle management,
-including revocation, remains in the web application until demonstrated CLI
-usage justifies additional commands.
+source, and key name without revealing credential material. The initial CLI
+does not expose logout, local credential removal, or key revocation. Re-running
+`auth login` may replace the stored credential only after explicit interactive
+confirmation. API-key lifecycle management, including revocation, remains in
+the web application until demonstrated CLI usage justifies additional commands.
 
 ### Initial API Key Authentication
 

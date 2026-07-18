@@ -98,6 +98,25 @@ try {
   const authHelpOutput = execFileSync(executable, ["auth", "--help"], {
     encoding: "utf8",
   });
+  const installedPackageDirectory =
+    process.platform === "win32"
+      ? resolve(installationPrefix, "node_modules", "@toughcrowd", "cli")
+      : resolve(
+          installationPrefix,
+          "lib",
+          "node_modules",
+          "@toughcrowd",
+          "cli",
+        );
+  const authSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(packageDirectory, "scripts/fixtures/package-smoke-auth.mjs"),
+      resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
 
   assert(
     versionOutput === `${metadata.version}\n`,
@@ -133,6 +152,10 @@ Commands:
         "  status [options]  Show the active Tough Crowd authentication status\n",
       ),
     "installed CLI returned the wrong auth help output",
+  );
+  assert(
+    authSmokeOutput === "Verified installed browser login\n",
+    "installed CLI failed the browser-login smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

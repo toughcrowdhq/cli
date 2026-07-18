@@ -92,7 +92,7 @@ function decodeKey(value: Record<string, unknown>): AuthIdentity["key"] {
   return {
     ...(id != null ? { id } : {}),
     ...(name != null ? { name } : {}),
-    ...(expiresAt !== undefined ? { expiresAt } : {}),
+    ...(expiresAt != null ? { expiresAt } : {}),
   };
 }
 

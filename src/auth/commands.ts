@@ -36,16 +36,16 @@ export interface AuthStatusOptions {
 
 export async function login(runtime: AuthRuntime): Promise<void> {
   const { apiOrigin, webOrigin } = resolveOrigins(runtime.env);
-  const apiKeyUrl = createApiKeyPageUrl(webOrigin);
-
-  runtime.stdout.write(`Create an API key: ${apiKeyUrl}\n`);
-  await runtime.openUrl(apiKeyUrl);
 
   if (!runtime.prompt.isInteractive) {
     throw new AuthCommandError(
       `Interactive login requires a TTY. Use ${apiKeyEnvironmentVariable} for non-interactive authentication.`,
     );
   }
+
+  const apiKeyUrl = createApiKeyPageUrl(webOrigin);
+  runtime.stdout.write(`Create an API key: ${apiKeyUrl}\n`);
+  await runtime.openUrl(apiKeyUrl);
 
   const apiKey = await runtime.prompt.readHiddenLine(
     "Paste API key: ",

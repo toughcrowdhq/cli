@@ -280,6 +280,29 @@ Expires: 2027-01-01T00:00:00.000Z
     expect(runtime.stderr.output).toBe("");
   });
 
+  it("login fails before printing or opening the browser without an interactive prompt", async () => {
+    let openedUrl: string | null = null;
+    const runtime = createRuntime({
+      prompt: createPrompt({
+        hiddenLine: "tc_new_secret",
+        isInteractive: false,
+      }),
+      openUrl(url) {
+        openedUrl = url;
+        return Promise.resolve(true);
+      },
+    });
+
+    const exitCode = await runCli(["auth", "login"], runtime);
+
+    expect(exitCode).toBe(1);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toBe(
+      "Interactive login requires a TTY. Use TOUGHCROWD_API_KEY for non-interactive authentication.\n",
+    );
+    expect(openedUrl).toBeNull();
+  });
+
   it("login confirms before replacing an existing stored key", async () => {
     const store = createMemoryCredentialStore({
       "https://api.toughcrowd.com": "tc_old_secret",

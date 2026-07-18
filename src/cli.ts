@@ -51,11 +51,6 @@ export async function runCli(
       return interrupted ? interruptedExitCode : 0;
     }
 
-    if (isUnknownRootCommand(args)) {
-      runtime.stderr.write(`error: unknown command '${args[0]}'\n`);
-      return usageErrorExitCode;
-    }
-
     await program.parseAsync([...args], { from: "user" });
 
     return interrupted ? interruptedExitCode : 0;
@@ -76,17 +71,6 @@ export async function runCli(
   } finally {
     runtime.signal.removeEventListener("abort", markInterrupted);
   }
-}
-
-function isUnknownRootCommand(args: readonly string[]): boolean {
-  const [firstArg] = args;
-
-  return (
-    firstArg != null &&
-    firstArg !== "--" &&
-    !firstArg.startsWith("-") &&
-    firstArg !== "auth"
-  );
 }
 
 function createRootProgram(runtime: CliRuntime): Command {

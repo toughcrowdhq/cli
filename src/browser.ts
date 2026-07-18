@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 
 export function openUrl(url: string): Promise<boolean> {
   const command = selectOpenCommand(url);
-  if (command == null) return Promise.resolve(false);
 
   return new Promise<boolean>((resolve) => {
     const child = spawn(command.command, command.args, {
@@ -18,9 +17,10 @@ export function openUrl(url: string): Promise<boolean> {
   });
 }
 
-function selectOpenCommand(
-  url: string,
-): { command: string; args: readonly string[] } | null {
+function selectOpenCommand(url: string): {
+  command: string;
+  args: readonly string[];
+} {
   if (process.platform === "darwin") return { command: "open", args: [url] };
   if (process.platform === "win32") {
     return { command: "cmd", args: ["/c", "start", "", url] };

@@ -17,6 +17,8 @@ try {
     stderr: process.stderr,
     version: readPackageVersion(),
     signal: abortController.signal,
+    env: process.env,
+    stdin: process.stdin,
   });
 } finally {
   process.off("SIGINT", abort);

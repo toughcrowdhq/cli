@@ -95,19 +95,26 @@ try {
   });
   const defaultOutput = execFileSync(executable, [], { encoding: "utf8" });
   const helpOutput = execFileSync(executable, ["--help"], { encoding: "utf8" });
+  const authHelpOutput = execFileSync(executable, ["auth", "--help"], {
+    encoding: "utf8",
+  });
 
   assert(
     versionOutput === `${metadata.version}\n`,
     "installed CLI returned the wrong version",
   );
   // Keep this release-contract assertion in sync with the root help in src/cli.ts.
-  const rootHelp = `Usage: toughcrowd [options]
+  const rootHelp = `Usage: toughcrowd [options] [command]
 
 The command-line client for Tough Crowd
 
 Options:
-  -V, --version  output the version number
-  -h, --help     display help for command
+  -V, --version   output the version number
+  -h, --help      display help for command
+
+Commands:
+  auth            Manage Tough Crowd authentication
+  help [command]  display help for command
 `;
   assert(
     defaultOutput === rootHelp,
@@ -116,6 +123,16 @@ Options:
   assert(
     helpOutput === rootHelp,
     "installed CLI returned the wrong --help output",
+  );
+  assert(
+    authHelpOutput.includes("Usage: toughcrowd auth [options] [command]\n") &&
+      authHelpOutput.includes(
+        "  login             Authenticate with a Tough Crowd API key\n",
+      ) &&
+      authHelpOutput.includes(
+        "  status [options]  Show the active Tough Crowd authentication status\n",
+      ),
+    "installed CLI returned the wrong auth help output",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

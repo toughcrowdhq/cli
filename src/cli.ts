@@ -1,4 +1,13 @@
 import { Command, CommanderError } from "commander";
+import { openUrl as defaultOpenUrl } from "./browser.js";
+import { login, status, type AuthRuntime } from "./auth/commands.js";
+import type { FetchLike } from "./api/request.js";
+import {
+  createKeyringCredentialStore,
+  type CredentialStore,
+} from "./auth/credentials.js";
+import { AuthCommandError } from "./auth/errors.js";
+import { createTerminalPrompt, type HiddenPrompt } from "./auth/prompt.js";
 
 export interface CliWritable {
   write(value: string): unknown;
@@ -9,6 +18,12 @@ export interface CliRuntime {
   stderr: CliWritable;
   version: string;
   signal: AbortSignal;
+  env?: NodeJS.ProcessEnv;
+  stdin?: NodeJS.ReadStream;
+  fetch?: FetchLike;
+  credentialStore?: CredentialStore;
+  prompt?: HiddenPrompt;
+  openUrl?(url: string): Promise<boolean>;
 }
 
 const interruptedExitCode = 130;
@@ -51,6 +66,11 @@ export async function runCli(
       return error.exitCode === 0 ? 0 : usageErrorExitCode;
     }
 
+    if (error instanceof AuthCommandError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     runtime.stderr.write(`${formatUnexpectedError(error)}\n`);
     return unexpectedFailureExitCode;
   } finally {
@@ -61,7 +81,12 @@ export async function runCli(
 function isUnknownRootCommand(args: readonly string[]): boolean {
   const [firstArg] = args;
 
-  return firstArg != null && firstArg !== "--" && !firstArg.startsWith("-");
+  return (
+    firstArg != null &&
+    firstArg !== "--" &&
+    !firstArg.startsWith("-") &&
+    firstArg !== "auth"
+  );
 }
 
 function createRootProgram(runtime: CliRuntime): Command {
@@ -86,7 +111,51 @@ function createRootProgram(runtime: CliRuntime): Command {
       },
     });
 
+  program
+    .command("auth")
+    .description("Manage Tough Crowd authentication")
+    .addCommand(createAuthLoginCommand(runtime))
+    .addCommand(createAuthStatusCommand(runtime));
+
   return program;
+}
+
+function createAuthLoginCommand(runtime: CliRuntime): Command {
+  return new Command("login")
+    .description("Authenticate with a Tough Crowd API key")
+    .allowExcessArguments(false)
+    .allowUnknownOption(false)
+    .action(async () => {
+      await login(createAuthRuntime(runtime));
+    });
+}
+
+function createAuthStatusCommand(runtime: CliRuntime): Command {
+  return new Command("status")
+    .description("Show the active Tough Crowd authentication status")
+    .option("--json", "print machine-readable JSON")
+    .allowExcessArguments(false)
+    .allowUnknownOption(false)
+    .action(async (options: { json?: boolean }) => {
+      await status(createAuthRuntime(runtime), { json: options.json === true });
+    });
+}
+
+function createAuthRuntime(runtime: CliRuntime): AuthRuntime {
+  return {
+    stdout: runtime.stdout,
+    stderr: runtime.stderr,
+    version: runtime.version,
+    signal: runtime.signal,
+    env: runtime.env,
+    fetch: runtime.fetch,
+    credentialStore: runtime.credentialStore ?? createKeyringCredentialStore(),
+    prompt:
+      runtime.prompt ??
+      createTerminalPrompt(runtime.stdin ?? process.stdin, runtime.stderr),
+    openUrl: (url) =>
+      runtime.openUrl != null ? runtime.openUrl(url) : defaultOpenUrl(url),
+  };
 }
 
 function formatUnexpectedError(error: unknown): string {

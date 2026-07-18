@@ -60,6 +60,23 @@ describe("terminal prompt", () => {
     expect(input.rawModes).toEqual([true, false]);
     expect(input.paused).toBe(1);
   });
+
+  it("restores raw mode after an input stream error", async () => {
+    const input = createFakeInput();
+    const output = createOutput();
+    const prompt = createTerminalPrompt(input.stream, output);
+
+    const result = prompt.readHiddenLine(
+      "Paste API key: ",
+      new AbortController().signal,
+    );
+    input.emitError(new Error("tty failed"));
+
+    await expect(result).rejects.toThrow("tty failed");
+    expect(input.rawModes).toEqual([true, false]);
+    expect(input.paused).toBe(1);
+    expect(output.value).toBe("Paste API key: \n");
+  });
 });
 
 function createFakeInput(): {
@@ -67,6 +84,7 @@ function createFakeInput(): {
   rawModes: boolean[];
   paused: number;
   emit(value: string | Buffer): void;
+  emitError(error: Error): void;
 } {
   const events = new EventEmitter();
   const state = {
@@ -111,6 +129,9 @@ function createFakeInput(): {
         "data",
         typeof value === "string" ? Buffer.from(value) : value,
       );
+    },
+    emitError(error) {
+      events.emit("error", error);
     },
   };
 }

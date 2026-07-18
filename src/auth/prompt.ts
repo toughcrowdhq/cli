@@ -60,6 +60,7 @@ async function readLineRaw(options: {
   return new Promise<string>((resolve, reject) => {
     const cleanup = (): void => {
       input.off("data", onData);
+      input.off("error", onError);
       signal.removeEventListener("abort", onAbort);
       setRawMode(wasRaw);
       input.pause();
@@ -79,6 +80,10 @@ async function readLineRaw(options: {
 
     const onAbort = (): void => {
       fail(new AuthCommandError("Authentication canceled.", 130));
+    };
+
+    const onError = (error: unknown): void => {
+      fail(error instanceof Error ? error : new Error("Input stream failed"));
     };
 
     const onData = (chunk: Buffer): void => {
@@ -105,6 +110,7 @@ async function readLineRaw(options: {
 
     output.write(prompt);
     signal.addEventListener("abort", onAbort, { once: true });
+    input.on("error", onError);
     input.on("data", onData);
     input.resume();
     setRawMode(true);

@@ -115,7 +115,12 @@ export async function login(runtime: AuthRuntime): Promise<void> {
       },
     });
   } finally {
-    await listener.close();
+    try {
+      await listener.close();
+    } catch {
+      // A terminal auth failure has already been selected. Cleanup must not
+      // replace it with an unformatted listener shutdown error.
+    }
   }
 }
 
@@ -187,6 +192,11 @@ function formatAuthorizationFailure(error: unknown): AuthCommandError {
     if (error.kind === "timeout") {
       return new AuthCommandError(
         "Authentication timed out. Existing credential was left unchanged.",
+      );
+    }
+    if (error.kind === "close") {
+      return new AuthCommandError(
+        "Authentication failed: the local callback listener could not close safely. Existing credential was left unchanged.",
       );
     }
     return new AuthCommandError(

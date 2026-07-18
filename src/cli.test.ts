@@ -457,6 +457,36 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
     expect(fetch.calls).toEqual([]);
   });
 
+  it("preserves the formatted listener shutdown failure when cleanup also rejects", async () => {
+    const store = createMemoryCredentialStore({
+      "https://api.toughcrowd.com": "tc_old_secret",
+    });
+    const loopback = createLoopbackHarness({
+      waitError: new LoopbackAuthorizationError(
+        "close",
+        "listener shutdown exposed sensitive details",
+      ),
+      closeError: new Error("cached close rejection exposed sensitive details"),
+    });
+    const runtime = createRuntime({
+      credentialStore: store,
+      bindLoopbackListener: loopback.factory,
+      fetch: createAuthorizationFetch(),
+      openUrl: () => Promise.resolve(true),
+    });
+
+    const exitCode = await runCli(["auth", "login"], runtime);
+
+    expect(exitCode).toBe(1);
+    expect(runtime.stderr.output).toBe(
+      "Authentication failed: the local callback listener could not close safely. Existing credential was left unchanged.\n",
+    );
+    expect(runtime.stderr.output).not.toContain("sensitive details");
+    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.writes).toEqual([]);
+    expect(loopback.listeners[0].closeCalls).toBe(1);
+  });
+
   it("closes the listener when authorization cannot be started", async () => {
     const store = createMemoryCredentialStore({
       "https://api.toughcrowd.com": "tc_old_secret",
@@ -689,6 +719,7 @@ function createLoopbackHarness(
     callback?: LoopbackCallback;
     waitError?: Error;
     bindError?: Error;
+    closeError?: Error;
     waitForAbort?: boolean;
   } = {},
 ): LoopbackHarness {
@@ -723,7 +754,9 @@ function createLoopbackHarness(
         },
         close() {
           listenerState.closeCalls += 1;
-          return Promise.resolve();
+          return options.closeError == null
+            ? Promise.resolve()
+            : Promise.reject(options.closeError);
         },
       });
     },

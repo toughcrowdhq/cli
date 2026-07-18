@@ -103,6 +103,9 @@ export function decodeExchangedCliAuthorization(
     throw new TypeError("authorization exchange response is invalid");
   }
 
+  // The public API calls the secret string `key` and its metadata object
+  // `apiKey`. Normalize those wire names to the CLI's `apiKey` and `key`
+  // fields at this boundary.
   const apiKey = readApiKey(value.key);
   const keyId = readUuid(value.apiKey.id);
   const keyName = readBoundedString(value.apiKey.name, 200);

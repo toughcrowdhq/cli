@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 export type LoopbackCallback =
   { kind: "approved"; code: string } | { kind: "denied" };
 
-export type LoopbackFailureKind = "canceled" | "listen" | "timeout";
+export type LoopbackFailureKind = "canceled" | "close" | "listen" | "timeout";
 
 export class LoopbackAuthorizationError extends Error {
   readonly kind: LoopbackFailureKind;
@@ -115,7 +115,7 @@ export async function bindLoopbackListener(
     } catch (error) {
       rejectCallback(
         new LoopbackAuthorizationError(
-          "listen",
+          "close",
           "The CLI callback listener could not close safely.",
           error,
         ),

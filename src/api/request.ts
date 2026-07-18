@@ -33,7 +33,7 @@ export interface RequestJsonOptions<T> {
   origin?: string;
   method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
   path: string;
-  authorization: string;
+  authorization?: string;
   body?: JsonValue;
   idempotencyKey?: string;
   requestId?: string;
@@ -115,12 +115,15 @@ function createHeaders(
   const metadata = createClientMetadata(options.metadata);
   const headers = new Headers({
     accept: jsonContentType,
-    authorization: options.authorization,
     "user-agent": `${metadata.cliName}/${metadata.cliVersion} node/${metadata.nodeVersion} ${metadata.platform}/${metadata.arch}`,
     "x-toughcrowd-client": `${metadata.cliName}/${metadata.cliVersion}`,
     "x-request-id": requestId,
     "x-toughcrowd-runtime": `node/${metadata.nodeVersion}; ${metadata.platform}; ${metadata.arch}`,
   });
+
+  if (options.authorization != null) {
+    headers.set("authorization", options.authorization);
+  }
 
   if (options.body !== undefined) {
     headers.set("content-type", jsonContentType);
@@ -225,7 +228,7 @@ async function decodeErrorResponse(response: Response): Promise<never> {
     message: envelope.error.message,
     status: response.status,
     code: envelope.error.code,
-    requestId: envelope.requestId ?? requestId,
+    requestId: envelope.error.requestId ?? envelope.requestId ?? requestId,
     fields: envelope.error.fields,
   });
 }

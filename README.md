@@ -22,8 +22,20 @@ From the repository root:
 ```sh
 corepack enable
 pnpm install
+cp .env.example .env.local
+pnpm dev --help
+```
+
+`pnpm dev <arguments>` runs the latest TypeScript source and optionally loads
+the local API origin from the gitignored `.env.local` file. Shell environment
+variables override values loaded from that file. The example points the CLI at
+the default local API port.
+
+Build and run the distributable JavaScript when checking the production path:
+
+```sh
 pnpm build
-pnpm start
+pnpm start --help
 ```
 
 Expected output:
@@ -63,16 +75,17 @@ does not install `crowd` as an alias.
 
 ## Authentication
 
-Use an API key from the Tough Crowd web app:
+Authenticate through the Tough Crowd web app:
 
 ```sh
 toughcrowd auth login
 toughcrowd auth status
 ```
 
-`auth login` prints the API-key page URL, opens it when possible, reads the key
-through a hidden TTY prompt, validates it, and stores it in the operating-system
-credential store for the current API origin.
+`auth login` binds a temporary IPv4 loopback callback, opens browser approval,
+exchanges the approved one-time code, and stores the resulting API key in the
+operating-system credential store for the current API origin. The API key is
+never displayed or pasted into the terminal.
 
 For non-interactive environments, set `TOUGHCROWD_API_KEY`:
 
@@ -81,8 +94,7 @@ TOUGHCROWD_API_KEY=tc_... toughcrowd auth status
 ```
 
 Environment credentials take precedence over stored credentials and are never
-persisted. Override the API origin with `TOUGHCROWD_API_ORIGIN`; override the
-web origin used for the login URL with `TOUGHCROWD_WEB_ORIGIN`.
+persisted. Override the API origin with `TOUGHCROWD_API_ORIGIN`.
 
 ## Releases
 

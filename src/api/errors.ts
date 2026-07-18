@@ -40,6 +40,7 @@ interface ApiErrorEnvelope {
     code: string;
     message: string;
     fields?: readonly ApiErrorField[];
+    requestId?: string;
   };
   requestId?: string;
 }
@@ -58,17 +59,31 @@ export function decodeApiErrorEnvelope(
   const message = readBoundedString(value.error.message, maxMessageLength);
   if (code == null || message == null) return null;
 
-  const requestId = readOptionalBoundedString(value.requestId, maxCodeLength);
-  if (requestId === undefined) return null;
+  const nestedRequestId = readOptionalBoundedString(
+    value.error.requestId,
+    maxCodeLength,
+  );
+  const legacyRequestId = readOptionalBoundedString(
+    value.requestId,
+    maxCodeLength,
+  );
+  if (nestedRequestId === undefined || legacyRequestId === undefined) {
+    return null;
+  }
 
-  const fields = decodeApiErrorFields(value.error.fields);
+  const fields = decodeApiErrorFields(
+    value.error.details ?? value.error.fields,
+  );
   if (fields === undefined) return null;
+
+  const requestId = nestedRequestId ?? legacyRequestId;
 
   return {
     error: {
       code,
       message,
       ...(fields.length > 0 ? { fields } : {}),
+      ...(requestId != null ? { requestId } : {}),
     },
     ...(requestId != null ? { requestId } : {}),
   };

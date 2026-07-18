@@ -127,7 +127,7 @@ Commands:
   assert(
     authHelpOutput.includes("Usage: toughcrowd auth [options] [command]\n") &&
       authHelpOutput.includes(
-        "  login             Authenticate with a Tough Crowd API key\n",
+        "  login             Authenticate through browser approval\n",
       ) &&
       authHelpOutput.includes(
         "  status [options]  Show the active Tough Crowd authentication status\n",

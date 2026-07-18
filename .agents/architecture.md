@@ -440,7 +440,7 @@ Store credentials keyed by canonical API origin so production and local
 development can coexist without sharing credentials:
 
 ```text
-https://api.toughcrowd.com -> production credential
+https://api.toughcrowd.dev -> production credential
 http://localhost:3001     -> local-development credential
 ```
 

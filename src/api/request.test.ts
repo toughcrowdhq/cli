@@ -16,7 +16,7 @@ describe("requestJson", () => {
     );
 
     const response = await requestJson({
-      origin: "https://api.toughcrowd.com",
+      origin: "https://api.toughcrowd.dev",
       method: "POST",
       path: "/api/example",
       authorization: "Bearer tc_secret",
@@ -31,7 +31,7 @@ describe("requestJson", () => {
 
     expect(response).toEqual({ ok: true });
     expect(fetch.calls).toHaveLength(1);
-    expect(fetch.calls[0].url).toBe("https://api.toughcrowd.com/api/example");
+    expect(fetch.calls[0].url).toBe("https://api.toughcrowd.dev/api/example");
     expect(fetch.calls[0].init.method).toBe("POST");
     expect(fetch.calls[0].init.redirect).toBe("manual");
     expect(fetch.calls[0].init.body).toBe(
@@ -158,7 +158,7 @@ describe("requestJson", () => {
 
     expect(fetch.calls).toHaveLength(1);
     expect(fetch.calls[0].init.redirect).toBe("manual");
-    expect(fetch.calls[0].url).toBe("https://api.toughcrowd.com/api/example");
+    expect(fetch.calls[0].url).toBe("https://api.toughcrowd.dev/api/example");
   });
 
   it("requires JSON content type for successful responses", async () => {

@@ -22,7 +22,7 @@ describe("CLI authorization API operations", () => {
       jsonResponse(
         {
           authorizationUrl:
-            "https://app.toughcrowd.com/cli/authorize#request=tc_cli_request_value",
+            "https://app.toughcrowd.dev/cli/authorize#request=tc_cli_request_value",
           expiresAt: "2026-07-18T20:10:00.000Z",
         },
         201,
@@ -30,7 +30,7 @@ describe("CLI authorization API operations", () => {
     );
 
     const result = await startCliAuthorization({
-      apiOrigin: "https://api.toughcrowd.com",
+      apiOrigin: "https://api.toughcrowd.dev",
       callbackUri: "http://127.0.0.1:49152/callback",
       codeChallenge,
       state,
@@ -42,12 +42,12 @@ describe("CLI authorization API operations", () => {
 
     expect(result).toEqual({
       authorizationUrl:
-        "https://app.toughcrowd.com/cli/authorize#request=tc_cli_request_value",
+        "https://app.toughcrowd.dev/cli/authorize#request=tc_cli_request_value",
       expiresAt: "2026-07-18T20:10:00.000Z",
     });
     expect(fetch.calls).toHaveLength(1);
     expect(fetch.calls[0].url).toBe(
-      "https://api.toughcrowd.com/api/cli-authorizations",
+      "https://api.toughcrowd.dev/api/cli-authorizations",
     );
     expect(fetch.calls[0].method).toBe("POST");
     expect(fetch.calls[0].authorization).toBeNull();
@@ -80,7 +80,7 @@ describe("CLI authorization API operations", () => {
     );
 
     const result = await exchangeCliAuthorization({
-      apiOrigin: "https://api.toughcrowd.com",
+      apiOrigin: "https://api.toughcrowd.dev",
       code: authorizationCode,
       codeVerifier,
       version: "0.2.0",
@@ -102,7 +102,7 @@ describe("CLI authorization API operations", () => {
       },
     });
     expect(fetch.calls[0].url).toBe(
-      "https://api.toughcrowd.com/api/cli-authorizations/exchange",
+      "https://api.toughcrowd.dev/api/cli-authorizations/exchange",
     );
     expect(fetch.calls[0].authorization).toBeNull();
     expect(fetch.calls[0].body).toBe(
@@ -117,21 +117,21 @@ describe("CLI authorization API operations", () => {
       "credential-bearing URL",
       {
         authorizationUrl:
-          "https://user:secret@app.toughcrowd.com/cli/authorize",
+          "https://user:secret@app.toughcrowd.dev/cli/authorize",
         expiresAt: "2026-07-18T20:10:00.000Z",
       },
     ],
     [
       "insecure remote URL",
       {
-        authorizationUrl: "http://app.toughcrowd.com/cli/authorize",
+        authorizationUrl: "http://app.toughcrowd.dev/cli/authorize",
         expiresAt: "2026-07-18T20:10:00.000Z",
       },
     ],
     [
       "invalid expiration",
       {
-        authorizationUrl: "https://app.toughcrowd.com/cli/authorize",
+        authorizationUrl: "https://app.toughcrowd.dev/cli/authorize",
         expiresAt: "tomorrow",
       },
     ],
@@ -176,7 +176,7 @@ describe("CLI authorization API operations", () => {
 
     const error = await captureApiClientError(
       exchangeCliAuthorization({
-        apiOrigin: "https://api.toughcrowd.com",
+        apiOrigin: "https://api.toughcrowd.dev",
         code: authorizationCode,
         codeVerifier,
         version: "0.2.0",

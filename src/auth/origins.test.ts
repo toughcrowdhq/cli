@@ -4,7 +4,7 @@ import { resolveAuthOrigin } from "./origins.js";
 
 describe("auth origin resolution", () => {
   it("uses the production API origin by default", () => {
-    expect(resolveAuthOrigin()).toBe("https://api.toughcrowd.com");
+    expect(resolveAuthOrigin()).toBe("https://api.toughcrowd.dev");
   });
 
   it("accepts a loopback API origin for local development", () => {

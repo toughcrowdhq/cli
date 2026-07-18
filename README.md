@@ -31,6 +31,17 @@ the local API origin from the gitignored `.env.local` file. Shell environment
 variables override values loaded from that file. The example points the CLI at
 the default local API port.
 
+Run the latest TypeScript source against the production API without loading
+`.env.local`:
+
+```sh
+pnpm dev:prod auth login
+pnpm dev:prod auth status
+```
+
+This uses the CLI's built-in `https://api.toughcrowd.dev` origin and operates
+on real production data.
+
 Build and run the distributable JavaScript when checking the production path:
 
 ```sh

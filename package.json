@@ -35,6 +35,7 @@
     "changeset:status": "changeset status",
     "changeset:version": "changeset version",
     "dev": "tsx --env-file-if-exists=.env.local src/index.ts",
+    "dev:prod": "tsx src/index.ts",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "lint": "eslint src scripts --max-warnings 0",

@@ -1,4 +1,4 @@
-export const defaultApiOrigin = "https://api.toughcrowd.com";
+export const defaultApiOrigin = "https://api.toughcrowd.dev";
 
 export class ApiOriginError extends Error {
   constructor(message: string) {

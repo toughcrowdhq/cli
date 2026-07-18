@@ -9,7 +9,7 @@ import {
 } from "./auth/loopback.js";
 
 const authorizationUrl =
-  "https://app.toughcrowd.com/cli/authorize#request=browser-request";
+  "https://app.toughcrowd.dev/cli/authorize#request=browser-request";
 const authorizationState = "sssssssssssssssssssssssssssssssssssssssssss";
 const codeVerifier = "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv";
 const codeChallenge = "ccccccccccccccccccccccccccccccccccccccccccc";
@@ -152,7 +152,7 @@ describe("Tough Crowd CLI", () => {
 
   it("reports valid stored authentication status without exposing the key", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_stored_secret",
+      "https://api.toughcrowd.dev": "tc_stored_secret",
     });
     const fetch = createIdentityFetch("tc_stored_secret");
     const runtime = createRuntime({ credentialStore: store, fetch });
@@ -161,7 +161,7 @@ describe("Tough Crowd CLI", () => {
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(`Authenticated as ada@example.com
-API origin: https://api.toughcrowd.com
+API origin: https://api.toughcrowd.dev
 Credential source: stored
 API key: CLI key
 `);
@@ -175,7 +175,7 @@ API key: CLI key
     const runtime = createRuntime({
       env: { TOUGHCROWD_API_KEY: "tc_env_secret" },
       credentialStore: createMemoryCredentialStore({
-        "https://api.toughcrowd.com": "tc_stored_secret",
+        "https://api.toughcrowd.dev": "tc_stored_secret",
       }),
       fetch,
     });
@@ -185,7 +185,7 @@ API key: CLI key
     expect(exitCode).toBe(0);
     expect(JSON.parse(runtime.stdout.output)).toEqual({
       authenticated: true,
-      apiOrigin: "https://api.toughcrowd.com",
+      apiOrigin: "https://api.toughcrowd.dev",
       credentialSource: "environment",
       user: {
         id: "22222222-2222-4222-8222-222222222222",
@@ -224,7 +224,7 @@ API key: CLI key
     const runtime = createRuntime({
       env: { TOUGHCROWD_API_ORIGIN: "http://localhost:3000" },
       credentialStore: createMemoryCredentialStore({
-        "https://api.toughcrowd.com": "tc_prod_secret",
+        "https://api.toughcrowd.dev": "tc_prod_secret",
         "http://localhost:3000": "tc_local_secret",
       }),
       fetch,
@@ -247,7 +247,7 @@ API key: CLI key
     expect(exitCode).toBe(1);
     expect(runtime.stdout.output).toBe("");
     expect(runtime.stderr.output).toBe(
-      "Not authenticated for https://api.toughcrowd.com. Run `toughcrowd auth login` or set TOUGHCROWD_API_KEY.\n",
+      "Not authenticated for https://api.toughcrowd.dev. Run `toughcrowd auth login` or set TOUGHCROWD_API_KEY.\n",
     );
   });
 
@@ -289,18 +289,18 @@ API key: CLI key
     expect(runtime.stdout.output)
       .toBe(`Authorize Tough Crowd CLI: ${authorizationUrl}
 Authenticated as ada@example.com
-API origin: https://api.toughcrowd.com
+API origin: https://api.toughcrowd.dev
 Credential source: stored
 API key: Tough Crowd CLI 0.2.0 abcdef12
 `);
     expect(runtime.stderr.output).toBe("");
     expect(openedUrls).toEqual([authorizationUrl]);
     expect(store.values).toEqual({
-      "https://api.toughcrowd.com": exchangedApiKey,
+      "https://api.toughcrowd.dev": exchangedApiKey,
     });
     expect(store.writes).toEqual([
       {
-        apiOrigin: "https://api.toughcrowd.com",
+        apiOrigin: "https://api.toughcrowd.dev",
         apiKey: exchangedApiKey,
       },
     ]);
@@ -308,8 +308,8 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
     expect(loopback.binds[0].state).toBe(authorizationState);
     expect(loopback.listeners[0].closeCalls).toBe(1);
     expect(fetch.calls.map((call) => call.url)).toEqual([
-      "https://api.toughcrowd.com/api/cli-authorizations",
-      "https://api.toughcrowd.com/api/cli-authorizations/exchange",
+      "https://api.toughcrowd.dev/api/cli-authorizations",
+      "https://api.toughcrowd.dev/api/cli-authorizations/exchange",
     ]);
     expect(fetch.calls[0].body).toBe(
       JSON.stringify({
@@ -334,7 +334,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
 
   it("replaces an existing stored credential only after a successful exchange", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const runtime = createRuntime({
       credentialStore: store,
@@ -347,13 +347,13 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
 
     expect(exitCode).toBe(0);
     expect(store.reads).toEqual([]);
-    expect(store.values["https://api.toughcrowd.com"]).toBe(exchangedApiKey);
+    expect(store.values["https://api.toughcrowd.dev"]).toBe(exchangedApiKey);
     expect(store.writes).toHaveLength(1);
   });
 
   it("leaves the existing credential unchanged after browser denial", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const loopback = createLoopbackHarness({ callback: { kind: "denied" } });
     const runtime = createRuntime({
@@ -366,7 +366,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
     const exitCode = await runCli(["auth", "login"], runtime);
 
     expect(exitCode).toBe(1);
-    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.values["https://api.toughcrowd.dev"]).toBe("tc_old_secret");
     expect(store.writes).toEqual([]);
     expect(loopback.listeners[0].closeCalls).toBe(1);
     expect(runtime.stderr.output).toBe(
@@ -376,7 +376,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
 
   it("leaves the existing credential unchanged after timeout", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const loopback = createLoopbackHarness({
       waitError: new LoopbackAuthorizationError(
@@ -394,7 +394,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
     const exitCode = await runCli(["auth", "login"], runtime);
 
     expect(exitCode).toBe(1);
-    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.values["https://api.toughcrowd.dev"]).toBe("tc_old_secret");
     expect(loopback.listeners[0].closeCalls).toBe(1);
     expect(runtime.stderr.output).toBe(
       "Authentication timed out. Existing credential was left unchanged.\n",
@@ -405,7 +405,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
   it("closes the listener when browser login is canceled", async () => {
     const abortController = new AbortController();
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const loopback = createLoopbackHarness({ waitForAbort: true });
     const runtime = createRuntime({
@@ -422,7 +422,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
     const exitCode = await runCli(["auth", "login"], runtime);
 
     expect(exitCode).toBe(130);
-    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.values["https://api.toughcrowd.dev"]).toBe("tc_old_secret");
     expect(store.writes).toEqual([]);
     expect(loopback.listeners[0].closeCalls).toBe(1);
     expect(runtime.stderr.output).toBe("");
@@ -430,7 +430,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
 
   it("fails safely when the loopback listener cannot bind", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const loopback = createLoopbackHarness({
       bindError: new LoopbackAuthorizationError(
@@ -453,13 +453,13 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
       "Authentication failed: could not start the local callback listener. Use TOUGHCROWD_API_KEY for non-interactive authentication.\n",
     );
     expect(runtime.stderr.output).not.toContain("secret port");
-    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.values["https://api.toughcrowd.dev"]).toBe("tc_old_secret");
     expect(fetch.calls).toEqual([]);
   });
 
   it("preserves the formatted listener shutdown failure when cleanup also rejects", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const loopback = createLoopbackHarness({
       waitError: new LoopbackAuthorizationError(
@@ -482,14 +482,14 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
       "Authentication failed: the local callback listener could not close safely. Existing credential was left unchanged.\n",
     );
     expect(runtime.stderr.output).not.toContain("sensitive details");
-    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.values["https://api.toughcrowd.dev"]).toBe("tc_old_secret");
     expect(store.writes).toEqual([]);
     expect(loopback.listeners[0].closeCalls).toBe(1);
   });
 
   it("closes the listener when authorization cannot be started", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const loopback = createLoopbackHarness();
     const runtime = createRuntime({
@@ -505,7 +505,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
     expect(runtime.stderr.output).toBe(
       "Authentication failed: Authorization request was rejected.\n",
     );
-    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.values["https://api.toughcrowd.dev"]).toBe("tc_old_secret");
     expect(store.writes).toEqual([]);
     expect(loopback.listeners[0].closeCalls).toBe(1);
   });
@@ -559,7 +559,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
 
   it("closes the listener and preserves the old key when exchange reports expiry", async () => {
     const store = createMemoryCredentialStore({
-      "https://api.toughcrowd.com": "tc_old_secret",
+      "https://api.toughcrowd.dev": "tc_old_secret",
     });
     const loopback = createLoopbackHarness();
     const runtime = createRuntime({
@@ -575,7 +575,7 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
     expect(runtime.stderr.output).toBe(
       "Authentication failed: Authorization code expired.\n",
     );
-    expect(store.values["https://api.toughcrowd.com"]).toBe("tc_old_secret");
+    expect(store.values["https://api.toughcrowd.dev"]).toBe("tc_old_secret");
     expect(store.writes).toEqual([]);
     expect(loopback.listeners[0].closeCalls).toBe(1);
   });
@@ -621,10 +621,10 @@ API key: Tough Crowd CLI 0.2.0 abcdef12
       1, 1,
     ]);
     expect(fetch.calls.map((call) => call.url)).toEqual([
-      "https://api.toughcrowd.com/api/cli-authorizations",
-      "https://api.toughcrowd.com/api/cli-authorizations/exchange",
-      "https://api.toughcrowd.com/api/cli-authorizations",
-      "https://api.toughcrowd.com/api/cli-authorizations/exchange",
+      "https://api.toughcrowd.dev/api/cli-authorizations",
+      "https://api.toughcrowd.dev/api/cli-authorizations/exchange",
+      "https://api.toughcrowd.dev/api/cli-authorizations",
+      "https://api.toughcrowd.dev/api/cli-authorizations/exchange",
     ]);
     expect(store.writes).toHaveLength(2);
   });

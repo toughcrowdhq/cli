@@ -3,8 +3,8 @@ import { ApiOriginError, parseApiOrigin, resolveApiOrigin } from "./origin.js";
 
 describe("API origin parsing", () => {
   it("canonicalizes HTTPS production origins", () => {
-    expect(parseApiOrigin("https://API.ToughCrowd.com:443")).toBe(
-      "https://api.toughcrowd.com",
+    expect(parseApiOrigin("https://API.ToughCrowd.dev:443")).toBe(
+      "https://api.toughcrowd.dev",
     );
   });
 
@@ -19,17 +19,17 @@ describe("API origin parsing", () => {
   });
 
   it("uses the default production API origin", () => {
-    expect(resolveApiOrigin()).toBe("https://api.toughcrowd.com");
+    expect(resolveApiOrigin()).toBe("https://api.toughcrowd.dev");
   });
 
   it.each([
     ["not-a-url"],
-    ["ftp://api.toughcrowd.com"],
-    ["http://api.toughcrowd.com"],
-    ["https://user:secret@api.toughcrowd.com"],
-    ["https://api.toughcrowd.com/path"],
-    ["https://api.toughcrowd.com?api_key=secret"],
-    ["https://api.toughcrowd.com#secret"],
+    ["ftp://api.toughcrowd.dev"],
+    ["http://api.toughcrowd.dev"],
+    ["https://user:secret@api.toughcrowd.dev"],
+    ["https://api.toughcrowd.dev/path"],
+    ["https://api.toughcrowd.dev?api_key=secret"],
+    ["https://api.toughcrowd.dev#secret"],
   ])("rejects invalid or deceptive API origin %s", (input) => {
     expect(() => parseApiOrigin(input)).toThrow(ApiOriginError);
   });

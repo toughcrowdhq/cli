@@ -10,11 +10,11 @@ import {
 describe("API key credential records", () => {
   it("round-trips a format-tagged API key record", () => {
     const serialized = JSON.stringify(
-      encodeStoredApiKeyRecord("https://api.toughcrowd.com", "tc_secret"),
+      encodeStoredApiKeyRecord("https://api.toughcrowd.dev", "tc_secret"),
     );
 
     expect(
-      decodeStoredApiKeyRecord(serialized, "https://api.toughcrowd.com"),
+      decodeStoredApiKeyRecord(serialized, "https://api.toughcrowd.dev"),
     ).toBe("tc_secret");
   });
 
@@ -24,10 +24,10 @@ describe("API key credential records", () => {
         JSON.stringify({
           formatVersion: 2,
           kind: "oauth-token",
-          apiOrigin: "https://api.toughcrowd.com",
+          apiOrigin: "https://api.toughcrowd.dev",
           apiKey: "tc_secret",
         }),
-        "https://api.toughcrowd.com",
+        "https://api.toughcrowd.dev",
       ),
     ).toThrow(AuthCommandError);
   });
@@ -36,7 +36,7 @@ describe("API key credential records", () => {
     expect(() =>
       decodeStoredApiKeyRecord(
         JSON.stringify(
-          encodeStoredApiKeyRecord("https://api.toughcrowd.com", "tc_secret"),
+          encodeStoredApiKeyRecord("https://api.toughcrowd.dev", "tc_secret"),
         ),
         "http://localhost:3000",
       ),
@@ -59,7 +59,7 @@ describe("credential resolution", () => {
       resolveCredential({
         env: { TOUGHCROWD_API_KEY: "tc_env" },
         store,
-        apiOrigin: "https://api.toughcrowd.com",
+        apiOrigin: "https://api.toughcrowd.dev",
       }),
     ).resolves.toEqual({ apiKey: "tc_env", source: "environment" });
   });

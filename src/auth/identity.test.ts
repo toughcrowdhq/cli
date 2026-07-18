@@ -29,7 +29,7 @@ describe("API-key identity", () => {
     }> = [];
 
     const identity = await validateApiKey({
-      apiOrigin: "https://api.toughcrowd.com",
+      apiOrigin: "https://api.toughcrowd.dev",
       apiKey: "tc_key_secret",
       signal: new AbortController().signal,
       version: "0.2.0",
@@ -49,7 +49,7 @@ describe("API-key identity", () => {
 
     expect(calls).toEqual([
       {
-        url: "https://api.toughcrowd.com/api/me",
+        url: "https://api.toughcrowd.dev/api/me",
         authorization: "Bearer tc_key_secret",
       },
     ]);

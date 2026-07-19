@@ -117,6 +117,18 @@ try {
     ],
     { encoding: "utf8" },
   );
+  const sessionListSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(
+        packageDirectory,
+        "scripts/fixtures/package-smoke-session-list.mjs",
+      ),
+      resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
 
   assert(
     versionOutput === `${metadata.version}\n`,
@@ -133,6 +145,7 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  session         Work with Tough Crowd sessions
   help [command]  display help for command
 `;
   assert(
@@ -156,6 +169,10 @@ Commands:
   assert(
     authSmokeOutput === "Verified installed browser login\n",
     "installed CLI failed the browser-login smoke test",
+  );
+  assert(
+    sessionListSmokeOutput === "Verified installed session list\n",
+    "installed CLI failed the authenticated session-list smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

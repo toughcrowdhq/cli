@@ -92,7 +92,7 @@ toughcrowd session list [--status <status>] [--repo <owner/name>]
 ```
 
 The default request returns one server-defined page in newest-first order.
-Human output shows stable, bounded fields: short ID, status, repository, title,
+Human output shows stable, bounded fields: full ID, status, repository, title,
 and creation time, followed by a next-cursor hint only when another page
 exists. `--json` emits one JSON object containing `sessions`, `counts`, and
 `pageInfo`. Empty results are successful and explicit. The initial command
@@ -138,22 +138,22 @@ and rules after printing the creation summary.
 
 ### Phase 1 — Read Sessions
 
-- [ ] Add the `session` namespace and literal root, namespace, and `list` help
+- [x] Add the `session` namespace and literal root, namespace, and `list` help
       tests without changing `auth` behavior.
-- [ ] Define the smallest handwritten session summary, list envelope, status,
+- [x] Define the smallest handwritten session summary, list envelope, status,
       counts, and pagination types with adversarial runtime decoders.
-- [ ] Add one reusable authenticated session API runtime that resolves the API
+- [x] Add one reusable authenticated session API runtime that resolves the API
       origin and bearer credential through the existing auth boundaries.
-- [ ] Implement the list application operation and encode `status`, `repo`,
+- [x] Implement the list application operation and encode `status`, `repo`,
       `limit`, and opaque `cursor` query values without changing origins.
-- [ ] Implement bounded human list output, explicit empty output, next-cursor
+- [x] Implement bounded human list output, explicit empty output, next-cursor
       guidance, and one stable JSON document for `--json`.
-- [ ] Add literal command tests for filters, pagination, empty results,
+- [x] Add literal command tests for filters, pagination, empty results,
       malformed responses, missing or revoked credentials, API errors,
       cancellation, stdout, stderr, and exit codes.
-- [ ] Update README examples and the installed-package smoke fixture for
+- [x] Update README examples and the installed-package smoke fixture for
       deterministic bearer-authenticated `session list` behavior.
-- [ ] Add a Changeset and run the full CLI verification suite before shipping
+- [x] Add a Changeset and run the full CLI verification suite before shipping
       the read phase.
 
 ### Phase 2 — Create Sessions

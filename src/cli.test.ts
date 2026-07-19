@@ -28,6 +28,7 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  session         Work with Tough Crowd sessions
   help [command]  display help for command
 `;
 
@@ -65,11 +66,11 @@ describe("Tough Crowd CLI", () => {
   it("rejects unknown commands", async () => {
     const runtime = createRuntime();
 
-    const exitCode = await runCli(["session"], runtime);
+    const exitCode = await runCli(["unknown"], runtime);
 
     expect(exitCode).toBe(2);
     expect(runtime.stdout.output).toBe("");
-    expect(runtime.stderr.output).toBe("error: unknown command 'session'\n");
+    expect(runtime.stderr.output).toBe("error: unknown command 'unknown'\n");
   });
 
   it("rejects unknown options", async () => {

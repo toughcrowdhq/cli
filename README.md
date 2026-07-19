@@ -3,8 +3,8 @@
 The public command-line client for Tough Crowd, which supervises coding-agent
 work in cloud sandboxes and helps people decide what is safe to ship.
 
-Version 0.1 provides the command foundation and API-key authentication while
-the first session commands are developed.
+The CLI provides API-key authentication and the first read-only session
+workflow.
 
 ## Install
 
@@ -62,6 +62,7 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  session         Work with Tough Crowd sessions
   help [command]  display help for command
 ```
 
@@ -106,6 +107,30 @@ TOUGHCROWD_API_KEY=tc_... toughcrowd auth status
 
 Environment credentials take precedence over stored credentials and are never
 persisted. Override the API origin with `TOUGHCROWD_API_ORIGIN`.
+
+## Sessions
+
+List the newest page of sessions visible to the authenticated user:
+
+```sh
+toughcrowd session list
+toughcrowd session list --status running --repo acme/web
+```
+
+Human output includes each session's full ID so rows remain unambiguous and the
+identifier can be copied directly into other commands.
+
+Use `--limit <count>` to request between 1 and 100 sessions. When another page
+exists, human output prints a follow-up command containing the opaque cursor;
+pass it back unchanged with `--cursor <cursor>`. The command does not silently
+fetch every page.
+
+For automation, `--json` prints one validated document containing `sessions`,
+`counts`, and `pageInfo`:
+
+```sh
+toughcrowd session list --limit 25 --json
+```
 
 ## Releases
 

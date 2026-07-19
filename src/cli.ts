@@ -1,4 +1,9 @@
-import { Command, CommanderError } from "commander";
+import {
+  Command,
+  CommanderError,
+  InvalidArgumentError,
+  Option,
+} from "commander";
 import { openUrl as defaultOpenUrl } from "./browser.js";
 import { login, status, type AuthRuntime } from "./auth/commands.js";
 import type { FetchLike, TimerCapabilities } from "./api/request.js";
@@ -15,6 +20,9 @@ import {
   createAuthorizationSecrets,
   type AuthorizationSecrets,
 } from "./auth/pkce.js";
+import { list, type ListSessionCommandOptions } from "./session/list.js";
+import { SessionCommandError } from "./session/errors.js";
+import { sessionStatusFilters } from "./session/types.js";
 
 export interface CliWritable {
   write(value: string): unknown;
@@ -74,6 +82,11 @@ export async function runCli(
       return error.exitCode;
     }
 
+    if (error instanceof SessionCommandError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     runtime.stderr.write(`${formatUnexpectedError(error)}\n`);
     return unexpectedFailureExitCode;
   } finally {
@@ -109,7 +122,76 @@ function createRootProgram(runtime: CliRuntime): Command {
     .addCommand(createAuthLoginCommand(runtime))
     .addCommand(createAuthStatusCommand(runtime));
 
+  program
+    .command("session")
+    .description("Work with Tough Crowd sessions")
+    .addCommand(createSessionListCommand(runtime));
+
   return program;
+}
+
+function createSessionListCommand(runtime: CliRuntime): Command {
+  const command = new Command("list")
+    .description("List sessions visible to the authenticated user")
+    .addOption(
+      new Option("--status <status>", "filter by session status").choices([
+        ...sessionStatusFilters,
+      ]),
+    )
+    .option("--repo <owner/name>", "filter by repository")
+    .option("--limit <count>", "maximum sessions to return", parseListLimit)
+    .option("--cursor <cursor>", "continue from an opaque page cursor")
+    .option("--json", "print machine-readable JSON")
+    .allowExcessArguments(false)
+    .allowUnknownOption(false)
+    .action(async (options: ListSessionCommandOptions) => {
+      await list(
+        {
+          stdout: runtime.stdout,
+          version: runtime.version,
+          signal: runtime.signal,
+          env: runtime.env,
+          fetch: runtime.fetch,
+          timers: runtime.timers,
+          credentialStore:
+            runtime.credentialStore ?? createKeyringCredentialStore(),
+        },
+        {
+          status: options.status,
+          repo: options.repo,
+          limit: options.limit,
+          cursor: options.cursor,
+          json: options.json === true,
+        },
+      );
+    });
+
+  command.exitOverride().configureOutput({
+    writeOut: (value) => {
+      runtime.stdout.write(value);
+    },
+    writeErr: (value) => {
+      runtime.stderr.write(value);
+    },
+    outputError: (value, write) => {
+      write(value);
+    },
+  });
+
+  return command;
+}
+
+function parseListLimit(value: string): number {
+  if (!/^\d+$/u.test(value)) {
+    throw new InvalidArgumentError("must be an integer from 1 to 100");
+  }
+
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new InvalidArgumentError("must be an integer from 1 to 100");
+  }
+
+  return limit;
 }
 
 function createAuthLoginCommand(runtime: CliRuntime): Command {

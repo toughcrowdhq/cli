@@ -1,5 +1,15 @@
 # @toughcrowd/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- ae64ad3: Add the authenticated `toughcrowd session list` command with filters, cursor
+  pagination, bounded human output, and a stable JSON response.
+- c437c37: Add `toughcrowd session new` with deterministic repository and optional Agent
+  Profile override resolution, server-default delegation, idempotent creation
+  requests, and bounded human or JSON output.
+
 ## 0.2.0
 
 ### Minor Changes

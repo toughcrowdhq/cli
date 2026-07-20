@@ -251,6 +251,33 @@ describe("session list command", () => {
     );
   });
 
+  it("does not expose structured API 5xx messages", async () => {
+    const runtime = createRuntime({
+      env: { TOUGHCROWD_API_KEY: "tc_secret" },
+      fetch: createFetch(() =>
+        jsonResponse(
+          {
+            error: {
+              code: "internal-error",
+              message: "Database connection failed for production-primary.",
+              requestId: "req_internal_error",
+            },
+          },
+          500,
+        ),
+      ),
+    });
+
+    const exitCode = await runCli(["session", "list"], runtime);
+
+    expect(exitCode).toBe(1);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toBe(
+      "Could not list sessions: the Tough Crowd API returned an internal error.\n",
+    );
+    expect(runtime.stderr.output).not.toContain("production-primary");
+  });
+
   it("rejects malformed success responses", async () => {
     const runtime = createAuthenticatedRuntime({
       sessions: [{ id: "not-a-uuid" }],

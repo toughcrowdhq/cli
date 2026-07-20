@@ -314,6 +314,39 @@ describe("session new command", () => {
     expect(runtime.stderr.output).toBe(expectedError);
   });
 
+  it("does not expose structured API 5xx messages", async () => {
+    const runtime = createRuntime({
+      env: { TOUGHCROWD_API_KEY: "tc_secret" },
+      fetch: createFetch(() =>
+        apiError(
+          "internal-error",
+          "Database connection failed for production-primary.",
+          500,
+        ),
+      ),
+    });
+
+    const exitCode = await runCli(
+      [
+        "session",
+        "new",
+        "Fix checkout",
+        "--repo",
+        "acme/web",
+        "--profile",
+        "codex-cli-default",
+      ],
+      runtime,
+    );
+
+    expect(exitCode).toBe(1);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toBe(
+      "Could not create session: the Tough Crowd API returned an internal error.\n",
+    );
+    expect(runtime.stderr.output).not.toContain("production-primary");
+  });
+
   it("rejects malformed responses without exposing server fields", async () => {
     const runtime = createRuntime({
       env: { TOUGHCROWD_API_KEY: "tc_secret" },

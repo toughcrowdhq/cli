@@ -67,14 +67,14 @@ function formatListFailure(error: unknown): Error {
         `Authentication failed: ${error.message} Run \`toughcrowd auth login\` or set ${apiKeyEnvironmentVariable}.`,
       );
     }
-    if (error.kind === "api") {
-      return new SessionCommandError(
-        `Could not list sessions: ${error.message}`,
-      );
-    }
     if (error.status != null && error.status >= 500) {
       return new SessionCommandError(
         "Could not list sessions: the Tough Crowd API returned an internal error.",
+      );
+    }
+    if (error.kind === "api") {
+      return new SessionCommandError(
+        `Could not list sessions: ${error.message}`,
       );
     }
   }

@@ -112,14 +112,14 @@ function formatCreateFailure(error: unknown): Error {
         "Could not create session: repository is not available. Check --repo and your GitHub connection.",
       );
     }
-    if (error.kind === "api") {
-      return new SessionCommandError(
-        `Could not create session: ${error.message}`,
-      );
-    }
     if (error.status != null && error.status >= 500) {
       return new SessionCommandError(
         "Could not create session: the Tough Crowd API returned an internal error.",
+      );
+    }
+    if (error.kind === "api") {
+      return new SessionCommandError(
+        `Could not create session: ${error.message}`,
       );
     }
   }

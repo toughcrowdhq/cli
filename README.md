@@ -3,8 +3,8 @@
 The public command-line client for Tough Crowd, which supervises coding-agent
 work in cloud sandboxes and helps people decide what is safe to ship.
 
-The CLI provides API-key authentication and the first read-only session
-workflow.
+The CLI provides API-key authentication and initial session list and creation
+workflows.
 
 ## Install
 
@@ -109,6 +109,31 @@ Environment credentials take precedence over stored credentials and are never
 persisted. Override the API origin with `TOUGHCROWD_API_ORIGIN`.
 
 ## Sessions
+
+Create a durable cloud session with a prompt and repository:
+
+```sh
+toughcrowd session new "Fix the flaky checkout test" \
+  --repo toughcrowdhq/app
+```
+
+Repository resolution uses `--repo`, then `TOUGHCROWD_REPO`, then a
+recognizable GitHub HTTPS or SSH `origin` remote in the current checkout.
+Agent Profile overrides use `--profile`, then `TOUGHCROWD_AGENT_PROFILE`.
+Without an override, the server selects Codex with GPT-5.5 when the signed-in
+user has an OpenAI key, otherwise Claude with Opus 4.8 when they have an
+Anthropic key.
+If neither provider key is configured, creation fails with guidance.
+
+Use `--base-branch` and `--title` to override those creation fields. Human
+output includes the created session's full ID; `--json` prints one validated
+session document for automation:
+
+```sh
+TOUGHCROWD_REPO=toughcrowdhq/app \
+TOUGHCROWD_AGENT_PROFILE=codex-cli-default \
+toughcrowd session new "Fix the flaky checkout test" --json
+```
 
 List the newest page of sessions visible to the authenticated user:
 

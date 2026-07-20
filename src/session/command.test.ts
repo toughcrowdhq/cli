@@ -9,11 +9,12 @@ const sessionNamespaceHelp =
     "Work with Tough Crowd sessions",
     "",
     "Options:",
-    "  -h, --help      display help for command",
+    "  -h, --help              display help for command",
     "",
     "Commands:",
-    "  list [options]  List sessions visible to the authenticated user",
-    "  help [command]  display help for command",
+    "  list [options]          List sessions visible to the authenticated user",
+    "  new [options] <prompt>  Create a new coding-agent session",
+    "  help [command]          display help for command",
   ].join("\n") + "\n";
 
 const sessionListHelp =

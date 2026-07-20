@@ -51,6 +51,23 @@ export interface SessionList {
   pageInfo: SessionListPageInfo;
 }
 
+export interface CreatedSession {
+  id: string;
+  status: SessionStatus;
+  repository: {
+    fullName: string;
+  };
+  agentProfile: {
+    id: string;
+    name: string;
+  };
+  title: string | null;
+}
+
+export interface CreateSessionResponse {
+  session: CreatedSession;
+}
+
 const maximumPageSize = 100;
 const maximumTitleLength = 500;
 const maximumRepositoryNameLength = 255;
@@ -77,6 +94,40 @@ export function decodeSessionList(value: unknown): SessionList {
   const pageInfo = decodeSessionListPageInfo(value.pageInfo);
 
   return { sessions, counts, pageInfo };
+}
+
+export function decodeCreateSessionResponse(
+  value: unknown,
+): CreateSessionResponse {
+  if (!isRecord(value) || !isRecord(value.session)) {
+    throw new TypeError("create session response is invalid");
+  }
+
+  const id = readUuid(value.session.id);
+  const status = readSessionStatus(value.session.status);
+  const repository = decodeRepository(value.session.repository);
+  const agentProfile = decodeAgentProfile(value.session.agentProfile);
+  const title = readNullableString(value.session.title, maximumTitleLength);
+
+  if (
+    id == null ||
+    status == null ||
+    repository == null ||
+    agentProfile == null ||
+    title === undefined
+  ) {
+    throw new TypeError("created session is invalid");
+  }
+
+  return {
+    session: {
+      id,
+      status,
+      repository,
+      agentProfile,
+      title,
+    },
+  };
 }
 
 function decodeSessionSummary(value: unknown): SessionSummary {
@@ -116,6 +167,18 @@ function decodeRepository(
   if (fullName == null) return undefined;
 
   return { fullName };
+}
+
+function decodeAgentProfile(
+  value: unknown,
+): CreatedSession["agentProfile"] | null {
+  if (!isRecord(value)) return null;
+
+  const id = readNonemptyString(value.id, 120);
+  const name = readNonemptyString(value.name, 200);
+  if (id == null || name == null) return null;
+
+  return { id, name };
 }
 
 function decodeSessionStatusCounts(

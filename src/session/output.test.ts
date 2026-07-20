@@ -1,5 +1,32 @@
 import { expect, it } from "vitest";
-import { printHumanSessionList } from "./output.js";
+import { printHumanCreatedSession, printHumanSessionList } from "./output.js";
+
+it("keeps created-session fields bounded and strips terminal controls", () => {
+  let output = "";
+
+  printHumanCreatedSession(
+    {
+      write(value) {
+        output += value;
+      },
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      status: "queued",
+      repository: { fullName: "acme/web\u001b[31m" },
+      agentProfile: {
+        id: "codex-cli-default",
+        name: "Codex\nCLI",
+      },
+      title: "t".repeat(200),
+    },
+  );
+
+  expect(output).not.toContain("\u001b");
+  expect(output).toContain("Repository: acme/web [31m\n");
+  expect(output).toContain("Agent Profile: Codex CLI (codex-cli-default)\n");
+  expect(output).toContain(`Title: ${"t".repeat(117)}...\n`);
+});
 
 it("keeps human session rows bounded and strips terminal controls", () => {
   let output = "";

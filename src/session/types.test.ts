@@ -1,5 +1,62 @@
 import { describe, expect, it } from "vitest";
-import { decodeSessionList } from "./types.js";
+import { decodeCreateSessionResponse, decodeSessionList } from "./types.js";
+
+describe("decodeCreateSessionResponse", () => {
+  it("decodes only the bounded public creation contract", () => {
+    expect(
+      decodeCreateSessionResponse({
+        session: {
+          id: "33333333-3333-4333-8333-333333333333",
+          title: "Fix checkout",
+          status: "queued",
+          repository: {
+            fullName: "acme/web",
+            privateServerField: "discarded",
+          },
+          agentProfile: {
+            id: "codex-cli-default",
+            name: "Codex CLI",
+            model: "server-only",
+          },
+          initialPrompt: "discarded",
+          events: [],
+        },
+      }),
+    ).toEqual({
+      session: {
+        id: "33333333-3333-4333-8333-333333333333",
+        status: "queued",
+        repository: { fullName: "acme/web" },
+        agentProfile: {
+          id: "codex-cli-default",
+          name: "Codex CLI",
+        },
+        title: "Fix checkout",
+      },
+    });
+  });
+
+  it.each([
+    ["a non-object envelope", null],
+    ["a missing session", {}],
+    ["a malformed ID", createCreatedSessionResponse({ id: "not-a-uuid" })],
+    ["an unknown status", createCreatedSessionResponse({ status: "waiting" })],
+    [
+      "a missing repository",
+      createCreatedSessionResponse({ repository: null }),
+    ],
+    [
+      "a malformed Agent Profile",
+      createCreatedSessionResponse({ agentProfile: { id: "", name: "" } }),
+    ],
+    [
+      "an overlong title",
+      createCreatedSessionResponse({ title: "t".repeat(501) }),
+    ],
+  ])("rejects %s", (_description, value) => {
+    expect(() => decodeCreateSessionResponse(value)).toThrow(TypeError);
+  });
+});
 
 describe("decodeSessionList", () => {
   it("decodes only the bounded public list contract", () => {
@@ -159,6 +216,22 @@ function createSession() {
     status: "running",
     repository: { fullName: "acme/web" } as { fullName: string } | null,
     createdAt: "2026-07-18T20:01:02.000Z",
+  };
+}
+
+function createCreatedSessionResponse(overrides: Record<string, unknown>) {
+  return {
+    session: {
+      id: "33333333-3333-4333-8333-333333333333",
+      status: "queued",
+      repository: { fullName: "acme/web" },
+      agentProfile: {
+        id: "codex-cli-default",
+        name: "Codex CLI",
+      },
+      title: null,
+      ...overrides,
+    },
   };
 }
 

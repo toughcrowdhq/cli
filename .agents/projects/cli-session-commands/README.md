@@ -53,9 +53,10 @@ Each phase should be releasable and dogfoodable before the next phase begins.
 - Add concise append-only human output plus JSON for finite commands and JSONL
   for the event stream.
 - Resolve creation repository from `--repo`, then `TOUGHCROWD_REPO`, then a
-  recognizable GitHub `origin` remote. Resolve Agent Profile from `--profile`,
-  then `TOUGHCROWD_AGENT_PROFILE`; fail with actionable guidance when either
-  value remains unresolved.
+  recognizable GitHub `origin` remote. Resolve explicit Agent Profile overrides
+  from `--profile`, then `TOUGHCROWD_AGENT_PROFILE`; otherwise let the server
+  select Codex with GPT-5.5 for the user's configured OpenAI key, then Claude
+  with Opus 4.8 for their configured Anthropic key.
 - Send one generated idempotency key for each `session new` operation.
 - Stream normalized product events through an `AsyncIterable<SessionEvent>`
   that accepts an `AbortSignal`, tracks the last sequence, and resumes a
@@ -105,9 +106,10 @@ toughcrowd session new <prompt> [--repo <owner/name>] [--profile <profile-id>]
   [--base-branch <branch>] [--title <title>] [--json] [--watch]
 ```
 
-The prompt is one required positional argument. Repository and Agent Profile
-resolution is deterministic and reports the winning non-secret source in
-diagnostics when needed. Human output prints the created session's full ID,
+The prompt is one required positional argument. Repository and explicit Agent
+Profile override resolution is deterministic. With no override, the server
+selects a profile from the user's configured provider credentials. Human output
+prints the created session's full ID,
 status, repository, Agent Profile, and title; `--json` emits the validated
 session response. `--watch` is added only in the streaming phase and rejects
 `--json`; automation can compose `session new --json` with
@@ -158,25 +160,25 @@ and rules after printing the creation summary.
 
 ### Phase 2 — Create Sessions
 
-- [ ] Add focused non-secret input resolution for repository and Agent Profile
-      with literal flag, environment, GitHub `origin`, precedence, and missing
-      value tests.
-- [ ] Parse GitHub HTTPS and SSH origin remotes without executing repository
+- [x] Add focused non-secret input resolution for repository and explicit Agent
+      Profile overrides with literal flag, environment, GitHub `origin`,
+      precedence, and server-default delegation tests.
+- [x] Parse GitHub HTTPS and SSH origin remotes without executing repository
       hooks or accepting a non-GitHub remote as a product repository.
-- [ ] Define and decode the public create-session request and response without
+- [x] Define and decode the public create-session request and response without
       expanding the list DTO into the private app's full domain model.
-- [ ] Implement `session new` with required prompt, optional repository,
+- [x] Implement `session new` with required prompt, optional repository,
       profile, base-branch, and title inputs.
-- [ ] Generate one idempotency key per create operation and preserve it for all
+- [x] Generate one idempotency key per create operation and preserve it for all
       request attempts made by that operation.
-- [ ] Implement bounded human creation output and one stable JSON response for
+- [x] Implement bounded human creation output and one stable JSON response for
       `--json`.
-- [ ] Add literal tests for argument validation, input precedence, request
+- [x] Add literal tests for argument validation, input precedence, request
       shape, idempotency header, success, conflict, unavailable repository,
       invalid profile, malformed response, cancellation, and redaction.
-- [ ] Update README examples and the installed-package smoke fixture for a
+- [x] Update README examples and the installed-package smoke fixture for a
       deterministic session creation request.
-- [ ] Add a Changeset and run the full CLI verification suite before shipping
+- [x] Add a Changeset and run the full CLI verification suite before shipping
       the create phase.
 
 ### Phase 3 — Stream Events And Logs

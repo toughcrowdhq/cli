@@ -1,9 +1,55 @@
 import { requestJson, type RequestJsonOptions } from "../api/request.js";
 import {
+  decodeCreateSessionResponse,
   decodeSessionList,
+  type CreateSessionResponse,
   type SessionList,
   type SessionStatusFilter,
 } from "./types.js";
+
+export interface CreateSessionRequest {
+  prompt: string;
+  repository: string;
+  agentProfile?: string;
+  baseBranch?: string;
+  title?: string;
+}
+
+export interface CreateSessionOptions extends CreateSessionRequest {
+  apiOrigin: string;
+  authorization: string;
+  idempotencyKey: string;
+  signal: AbortSignal;
+  version: string;
+  fetch?: RequestJsonOptions<CreateSessionResponse>["fetch"];
+  timers?: RequestJsonOptions<CreateSessionResponse>["timers"];
+}
+
+export function createSession(
+  options: CreateSessionOptions,
+): Promise<CreateSessionResponse> {
+  return requestJson({
+    origin: options.apiOrigin,
+    method: "POST",
+    path: "/api/sessions",
+    authorization: options.authorization,
+    idempotencyKey: options.idempotencyKey,
+    body: {
+      prompt: options.prompt,
+      repository: options.repository,
+      ...(options.agentProfile != null
+        ? { agentProfile: options.agentProfile }
+        : {}),
+      ...(options.baseBranch != null ? { baseBranch: options.baseBranch } : {}),
+      ...(options.title != null ? { title: options.title } : {}),
+    },
+    signal: options.signal,
+    fetch: options.fetch,
+    timers: options.timers,
+    metadata: { cliVersion: options.version },
+    decode: decodeCreateSessionResponse,
+  });
+}
 
 export interface ListSessionsRequest {
   status?: SessionStatusFilter;

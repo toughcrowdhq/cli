@@ -1,4 +1,9 @@
-import type { SessionList, SessionSummary } from "./types.js";
+import type {
+  CreatedSession,
+  CreateSessionResponse,
+  SessionList,
+  SessionSummary,
+} from "./types.js";
 
 const columnWidths = {
   id: 36,
@@ -43,6 +48,31 @@ export function printJsonSessionList(
   stdout.write(`${JSON.stringify(result)}\n`);
 }
 
+export function printHumanCreatedSession(
+  stdout: { write(value: string): unknown },
+  session: CreatedSession,
+): void {
+  stdout.write("Session created\n");
+  stdout.write(`ID: ${session.id}\n`);
+  stdout.write(`Status: ${session.status}\n`);
+  stdout.write(
+    `Repository: ${formatBoundedValue(session.repository.fullName, 255)}\n`,
+  );
+  stdout.write(
+    `Agent Profile: ${formatBoundedValue(session.agentProfile.name, 200)} (${formatBoundedValue(session.agentProfile.id, 120)})\n`,
+  );
+  stdout.write(
+    `Title: ${session.title == null ? "(generating)" : formatBoundedValue(session.title, 120)}\n`,
+  );
+}
+
+export function printJsonCreatedSession(
+  stdout: { write(value: string): unknown },
+  result: CreateSessionResponse,
+): void {
+  stdout.write(`${JSON.stringify(result)}\n`);
+}
+
 function formatSession(session: SessionSummary): string {
   return formatRow({
     id: session.id,
@@ -78,6 +108,13 @@ function formatColumn(value: string, width: number): string {
       ? safeValue
       : `${safeValue.slice(0, width - 3)}...`;
   return bounded.padEnd(width);
+}
+
+function formatBoundedValue(value: string, maximumLength: number): string {
+  const safeValue = replaceTerminalControlCharacters(value);
+  return safeValue.length <= maximumLength
+    ? safeValue
+    : `${safeValue.slice(0, maximumLength - 3)}...`;
 }
 
 function replaceTerminalControlCharacters(value: string): string {

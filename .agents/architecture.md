@@ -458,9 +458,11 @@ toughcrowd auth status
 `auth status` should report the API origin, authenticated identity, credential
 source, and key name without revealing credential material. The initial CLI
 does not expose logout, local credential removal, or key revocation. Re-running
-`auth login` may replace the stored credential only after explicit interactive
-confirmation. API-key lifecycle management, including revocation, remains in
-the web application until demonstrated CLI usage justifies additional commands.
+`auth login` replaces the stored credential only after browser approval and a
+successful code exchange. A failed, denied, expired, or cancelled login leaves
+the existing credential unchanged. API-key lifecycle management, including
+revocation, remains in the web application until demonstrated CLI usage
+justifies additional commands.
 
 ### Initial API Key Authentication
 
@@ -477,22 +479,32 @@ last-used, expiration, and revocation metadata. Initial keys inherit the
 account's product permissions; do not introduce unused key scopes before the
 product has meaningfully different permission sets.
 
-`auth login` should direct the user to create a key in the web application,
-read the pasted key through a hidden interactive prompt, validate it against
-the resolved API origin, and store it through the configured credential store.
-Do not accept a key as a command-line option where it can leak through shell
-history or process listings.
+`auth login` uses browser-approved loopback authorization. It binds an
+operating-system-assigned port on `127.0.0.1`, generates state and a PKCE `S256`
+verifier and challenge, starts authorization through the resolved API origin,
+and opens the exact approval URL returned by that API. After approval, it
+validates the callback state, exchanges the short-lived code and verifier for
+an ordinary API key, and stores that key through the configured credential
+store. Interactive login never displays, pastes, or prompts for API-key
+material, and it has no manual fallback.
+
+The loopback listener must bind before browser launch, accept only the fixed
+`/callback` path on its exact IPv4 loopback host and assigned port, and close on
+every terminal outcome. Failure to open the browser is non-terminal because the
+printed approval URL remains usable. Failure to bind the listener is terminal
+and should direct non-interactive users to `TOUGHCROWD_API_KEY`.
 
 Supply non-persisted keys to CI, automation, and local debugging through
 `TOUGHCROWD_API_KEY`. An environment key is runtime-only and must never be
 persisted, refreshed, or modified automatically.
 
 If accounts later contain multiple users, existing API keys may remain
-account-owned automation credentials while browser-approved OAuth becomes the
-preferred human login. Both credential types must resolve to the same
-authenticated-principal boundary, and stored credential records must be
-format-versioned and tagged by credential type so the migration does not
-require reinterpreting API keys as OAuth refresh tokens.
+account-owned automation credentials while browser-approved API-key issuance
+continues to serve human login. A future move to expiring access and refresh
+tokens would be a separate authentication-contract decision. Both credential
+types must resolve to the same authenticated-principal boundary, and stored
+credential records must be format-versioned and tagged by credential type so a
+migration never reinterprets API keys as OAuth refresh tokens.
 
 ### Credential Storage
 
@@ -546,8 +558,7 @@ The initial environment contract is:
 
 ```text
 TOUGHCROWD_API_KEY
-TOUGHCROWD_API_URL
-TOUGHCROWD_WEB_URL
+TOUGHCROWD_API_ORIGIN
 TOUGHCROWD_REPO
 TOUGHCROWD_AGENT_PROFILE
 NO_COLOR
@@ -719,8 +730,8 @@ A future launcher would require a small stable toolchain manifest and must:
 
 - The minimum command set for the first API-backed CLI release.
 - The exact API key format, default lifetime, and maximum lifetime.
-- The product and account-model threshold for adding browser-approved OAuth as
-  the preferred human login.
+- The product and account-model threshold for replacing issued API keys with
+  expiring access and refresh tokens.
 - The filename, format, and initial schema for optional project configuration.
 - The public client support window and minimum-version enforcement policy.
 - Whether demonstrated usage ever justifies a Tough Crowd-managed

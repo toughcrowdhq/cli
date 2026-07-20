@@ -98,6 +98,57 @@ try {
   const authHelpOutput = execFileSync(executable, ["auth", "--help"], {
     encoding: "utf8",
   });
+  const sessionHelpOutput = execFileSync(executable, ["session", "--help"], {
+    encoding: "utf8",
+  });
+  const sessionNewHelpOutput = execFileSync(
+    executable,
+    ["session", "new", "--help"],
+    { encoding: "utf8" },
+  );
+  const installedPackageDirectory =
+    process.platform === "win32"
+      ? resolve(installationPrefix, "node_modules", "@toughcrowd", "cli")
+      : resolve(
+          installationPrefix,
+          "lib",
+          "node_modules",
+          "@toughcrowd",
+          "cli",
+        );
+  const authSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(packageDirectory, "scripts/fixtures/package-smoke-auth.mjs"),
+      resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
+  const sessionListSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(
+        packageDirectory,
+        "scripts/fixtures/package-smoke-session-list.mjs",
+      ),
+      resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
+  const sessionNewSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(
+        packageDirectory,
+        "scripts/fixtures/package-smoke-session-new.mjs",
+      ),
+      resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
 
   assert(
     versionOutput === `${metadata.version}\n`,
@@ -114,6 +165,7 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  session         Work with Tough Crowd sessions
   help [command]  display help for command
 `;
   assert(
@@ -133,6 +185,30 @@ Commands:
         "  status [options]  Show the active Tough Crowd authentication status\n",
       ),
     "installed CLI returned the wrong auth help output",
+  );
+  assert(
+    sessionHelpOutput.includes(
+      "  new [options] <prompt>  Create a new coding-agent session\n",
+    ) &&
+      sessionNewHelpOutput.includes(
+        "Usage: toughcrowd session new [options] <prompt>\n",
+      ) &&
+      sessionNewHelpOutput.includes(
+        "  --profile <profile-id>  Agent Profile to use\n",
+      ),
+    "installed CLI returned the wrong session-new help output",
+  );
+  assert(
+    authSmokeOutput === "Verified installed browser login\n",
+    "installed CLI failed the browser-login smoke test",
+  );
+  assert(
+    sessionListSmokeOutput === "Verified installed session list\n",
+    "installed CLI failed the authenticated session-list smoke test",
+  );
+  assert(
+    sessionNewSmokeOutput === "Verified installed session new\n",
+    "installed CLI failed the authenticated session-new smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

@@ -122,13 +122,13 @@ bounded identity through `/api/me`. It never opens a browser or listener.
 
 ### Documentation And Verification
 
-- [ ] Update README and `.agents/architecture.md` to describe browser-only
+- [x] Update README and `.agents/architecture.md` to describe browser-only
       interactive login and the single API-origin environment contract.
-- [ ] Add a Changeset for the login and environment-contract change.
-- [ ] Update the installed-package smoke test with deterministic injected
+- [x] Add a Changeset for the login and environment-contract change.
+- [x] Update the installed-package smoke test with deterministic injected
       browser, network, listener, and credential-store boundaries.
-- [ ] Run format, lint, typecheck, tests, build, and package smoke checks.
-- [ ] Verify the complete flow against the local app before release.
+- [x] Run format, lint, typecheck, tests, build, and package smoke checks.
+- [x] Verify the complete flow against the local app before release.
 
 ## Acceptance Criteria
 
@@ -152,3 +152,9 @@ bounded identity through `/api/me`. It never opens a browser or listener.
 
 2026-07-18: Browser-approved loopback login with PKCE replaces manual API-key
 entry. Device polling and general OAuth machinery remain deferred.
+
+2026-07-18: Verified the installed package with injected browser, network,
+listener, and credential-store boundaries. Format, lint, typecheck, 103 tests,
+build, and package smoke checks pass. The complete local app flow approved in
+the browser, stored the key for `http://localhost:3001`, and authenticated
+`auth status` through `/api/me`.

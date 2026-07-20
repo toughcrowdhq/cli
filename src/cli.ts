@@ -1,4 +1,10 @@
-import { Command, CommanderError } from "commander";
+import {
+  Command,
+  CommanderError,
+  InvalidArgumentError,
+  Option,
+} from "commander";
+import { randomUUID } from "node:crypto";
 import { openUrl as defaultOpenUrl } from "./browser.js";
 import { login, status, type AuthRuntime } from "./auth/commands.js";
 import type { FetchLike, TimerCapabilities } from "./api/request.js";
@@ -15,6 +21,12 @@ import {
   createAuthorizationSecrets,
   type AuthorizationSecrets,
 } from "./auth/pkce.js";
+import { readGitOriginUrl } from "./git.js";
+import { create, type CreateSessionCommandOptions } from "./session/create.js";
+import { list, type ListSessionCommandOptions } from "./session/list.js";
+import { SessionCommandError } from "./session/errors.js";
+import { sessionStatusFilters } from "./session/types.js";
+import type { SessionRuntime } from "./session/runtime.js";
 
 export interface CliWritable {
   write(value: string): unknown;
@@ -32,6 +44,8 @@ export interface CliRuntime {
   createAuthorizationSecrets?(): AuthorizationSecrets;
   bindLoopbackListener?: LoopbackListenerFactory;
   openUrl?(url: string): Promise<boolean>;
+  readGitOrigin?(): Promise<string | null>;
+  createIdempotencyKey?(): string;
 }
 
 const interruptedExitCode = 130;
@@ -74,6 +88,11 @@ export async function runCli(
       return error.exitCode;
     }
 
+    if (error instanceof SessionCommandError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     runtime.stderr.write(`${formatUnexpectedError(error)}\n`);
     return unexpectedFailureExitCode;
   } finally {
@@ -109,7 +128,127 @@ function createRootProgram(runtime: CliRuntime): Command {
     .addCommand(createAuthLoginCommand(runtime))
     .addCommand(createAuthStatusCommand(runtime));
 
+  program
+    .command("session")
+    .description("Work with Tough Crowd sessions")
+    .addCommand(createSessionListCommand(runtime))
+    .addCommand(createSessionNewCommand(runtime));
+
   return program;
+}
+
+function createSessionListCommand(runtime: CliRuntime): Command {
+  const command = new Command("list")
+    .description("List sessions visible to the authenticated user")
+    .addOption(
+      new Option("--status <status>", "filter by session status").choices([
+        ...sessionStatusFilters,
+      ]),
+    )
+    .option("--repo <owner/name>", "filter by repository")
+    .option("--limit <count>", "maximum sessions to return", parseListLimit)
+    .option("--cursor <cursor>", "continue from an opaque page cursor")
+    .option("--json", "print machine-readable JSON")
+    .allowExcessArguments(false)
+    .allowUnknownOption(false)
+    .action(async (options: ListSessionCommandOptions) => {
+      await list(createSessionRuntime(runtime), {
+        status: options.status,
+        repo: options.repo,
+        limit: options.limit,
+        cursor: options.cursor,
+        json: options.json === true,
+      });
+    });
+
+  return configureNestedCommand(command, runtime);
+}
+
+function createSessionNewCommand(runtime: CliRuntime): Command {
+  const command = new Command("new")
+    .description("Create a new coding-agent session")
+    .argument("<prompt>", "initial instruction for the coding agent")
+    .option("--repo <owner/name>", "repository for the session")
+    .option("--profile <profile-id>", "Agent Profile to use")
+    .option("--base-branch <branch>", "base branch for generated changes")
+    .option("--title <title>", "session title")
+    .option("--json", "print machine-readable JSON")
+    .allowExcessArguments(false)
+    .allowUnknownOption(false)
+    .action(
+      async (
+        prompt: string,
+        options: Omit<CreateSessionCommandOptions, "prompt">,
+      ) => {
+        await create(
+          {
+            ...createSessionRuntime(runtime),
+            readGitOrigin: () =>
+              runtime.readGitOrigin != null
+                ? runtime.readGitOrigin()
+                : readGitOriginUrl({ signal: runtime.signal }),
+            createIdempotencyKey: () =>
+              runtime.createIdempotencyKey != null
+                ? runtime.createIdempotencyKey()
+                : randomUUID(),
+          },
+          {
+            prompt,
+            repo: options.repo,
+            profile: options.profile,
+            baseBranch: options.baseBranch,
+            title: options.title,
+            json: options.json === true,
+          },
+        );
+      },
+    );
+
+  return configureNestedCommand(command, runtime);
+}
+
+function configureNestedCommand(
+  command: Command,
+  runtime: CliRuntime,
+): Command {
+  command.exitOverride().configureOutput({
+    writeOut: (value) => {
+      runtime.stdout.write(value);
+    },
+    writeErr: (value) => {
+      runtime.stderr.write(value);
+    },
+    outputError: (value, write) => {
+      write(value);
+    },
+  });
+
+  return command;
+}
+
+function createSessionRuntime(runtime: CliRuntime): SessionRuntime {
+  return {
+    stdout: runtime.stdout,
+    version: runtime.version,
+    signal: runtime.signal,
+    env: runtime.env,
+    fetch: runtime.fetch,
+    timers: runtime.timers,
+    credentialStore: runtime.credentialStore ?? createKeyringCredentialStore(),
+  };
+}
+
+function parseListLimit(value: string): number {
+  if (!/^\d+$/u.test(value)) {
+    throw new InvalidArgumentError("must be an integer from 1 to 100");
+  }
+
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new InvalidArgumentError("must be an integer from 1 to 100");
+  }
+
+  return limit;
 }
 
 function createAuthLoginCommand(runtime: CliRuntime): Command {

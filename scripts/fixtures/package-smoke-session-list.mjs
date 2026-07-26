@@ -18,7 +18,7 @@ const exitCode = await runCli(
     "session",
     "list",
     "--status",
-    "running",
+    "awaiting_checks",
     "--repo",
     "acme/web",
     "--limit",
@@ -58,7 +58,7 @@ const exitCode = await runCli(
           {
             id: "11111111-1111-4111-8111-111111111111",
             title: "Package smoke session",
-            status: "running",
+            status: "awaiting_checks",
             repository: {
               fullName: "acme/web",
               serverOnly: "discarded",
@@ -71,7 +71,9 @@ const exitCode = await runCli(
           all: 1,
           queued: 0,
           initializing: 0,
-          running: 1,
+          running: 0,
+          needs_input: 0,
+          awaiting_checks: 1,
           ready: 0,
           failed: 0,
           cancelled: 0,
@@ -96,7 +98,7 @@ assert(
     JSON.stringify({
       url:
         apiOrigin +
-        "/api/sessions?status=running&repository=acme%2Fweb&limit=1&cursor=opaque-cursor",
+        "/api/sessions?status=awaiting_checks&repository=acme%2Fweb&limit=1&cursor=opaque-cursor",
       method: "GET",
       authorization: "Bearer " + apiKey,
       client: "@toughcrowd/cli/" + cliVersion,
@@ -105,7 +107,7 @@ assert(
 );
 assert(
   stdout.value ===
-    '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Package smoke session","status":"running","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"}],"counts":{"all":1,"queued":0,"initializing":0,"running":1,"ready":0,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
+    '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Package smoke session","status":"awaiting_checks","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"}],"counts":{"all":1,"queued":0,"initializing":0,"running":0,"needs_input":0,"awaiting_checks":1,"ready":0,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
   "installed session list returned the wrong JSON document",
 );
 assert(

@@ -7,7 +7,7 @@ import type {
 
 const columnWidths = {
   id: 36,
-  status: 12,
+  status: 18,
   repository: 28,
   title: 48,
   createdAt: 24,
@@ -54,7 +54,7 @@ export function printHumanCreatedSession(
 ): void {
   stdout.write("Session created\n");
   stdout.write(`ID: ${session.id}\n`);
-  stdout.write(`Status: ${session.status}\n`);
+  stdout.write(`Status: ${formatHumanSessionStatus(session.status)}\n`);
   stdout.write(
     `Repository: ${formatBoundedValue(session.repository.fullName, 255)}\n`,
   );
@@ -76,11 +76,17 @@ export function printJsonCreatedSession(
 function formatSession(session: SessionSummary): string {
   return formatRow({
     id: session.id,
-    status: session.status,
+    status: formatHumanSessionStatus(session.status),
     repository: session.repository?.fullName ?? "(unavailable)",
     title: session.title ?? "(untitled)",
     createdAt: session.createdAt,
   });
+}
+
+function formatHumanSessionStatus(status: SessionSummary["status"]): string {
+  if (status === "needs_input") return "Needs input";
+  if (status === "awaiting_checks") return "Waiting for checks";
+  return status;
 }
 
 function formatRow(values: {

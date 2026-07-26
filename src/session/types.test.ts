@@ -97,6 +97,7 @@ describe("decodeSessionList", () => {
         queued: 0,
         initializing: 0,
         running: 1,
+        awaiting_checks: 0,
         ready: 0,
         failed: 0,
         cancelled: 0,
@@ -126,6 +127,41 @@ describe("decodeSessionList", () => {
       status: "cancelling",
       repository: null,
       createdAt: "2026-07-18T20:01:02.000Z",
+    });
+  });
+
+  it("accepts sessions waiting for checks", () => {
+    const value = createValidList();
+    value.sessions[0] = {
+      ...value.sessions[0],
+      status: "awaiting_checks",
+    };
+    value.counts = createCounts({ all: 1, awaiting_checks: 1 });
+
+    expect(decodeSessionList(value)).toEqual({
+      sessions: [
+        {
+          id: "11111111-1111-4111-8111-111111111111",
+          title: "Fix checkout",
+          status: "awaiting_checks",
+          repository: { fullName: "acme/web" },
+          createdAt: "2026-07-18T20:01:02.000Z",
+        },
+      ],
+      counts: {
+        all: 1,
+        queued: 0,
+        initializing: 0,
+        running: 0,
+        awaiting_checks: 1,
+        ready: 0,
+        failed: 0,
+        cancelled: 0,
+        merged: 0,
+        abandoned: 0,
+        archived: 0,
+      },
+      pageInfo: { nextCursor: null, hasMore: false },
     });
   });
 
@@ -241,6 +277,7 @@ function createCounts(overrides: Record<string, number> = {}) {
     queued: 0,
     initializing: 0,
     running: 0,
+    awaiting_checks: 0,
     ready: 0,
     failed: 0,
     cancelled: 0,

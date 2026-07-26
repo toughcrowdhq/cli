@@ -52,6 +52,7 @@ it("keeps human session rows bounded and strips terminal controls", () => {
         queued: 0,
         initializing: 0,
         running: 1,
+        awaiting_checks: 0,
         ready: 0,
         failed: 0,
         cancelled: 0,
@@ -65,8 +66,8 @@ it("keeps human session rows bounded and strips terminal controls", () => {
 
   const lines = output.trimEnd().split("\n");
   expect(lines).toHaveLength(2);
-  expect(lines[0]).toHaveLength(156);
-  expect(lines[1]).toHaveLength(156);
+  expect(lines[0]).toHaveLength(162);
+  expect(lines[1]).toHaveLength(162);
   expect(output).not.toContain("\u001b");
   expect(lines[1]).toContain("...");
 });
@@ -78,6 +79,7 @@ it("prints full IDs when their leading UUID components collide", () => {
     queued: 0,
     initializing: 0,
     running: 2,
+    awaiting_checks: 0,
     ready: 0,
     failed: 0,
     cancelled: 0,
@@ -118,4 +120,46 @@ it("prints full IDs when their leading UUID components collide", () => {
   expect(lines[0]).toMatch(/^ID {36}STATUS/u);
   expect(lines[1]).toMatch(/^019f76eb-1111-4111-8111-111111111111 {2}running/u);
   expect(lines[2]).toMatch(/^019f76eb-2222-4222-8222-222222222222 {2}running/u);
+});
+
+it("renders awaiting_checks as Waiting for checks", () => {
+  let output = "";
+
+  printHumanSessionList(
+    {
+      write(value) {
+        output += value;
+      },
+    },
+    {
+      sessions: [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          title: "Add merge confidence",
+          status: "awaiting_checks",
+          repository: { fullName: "toughcrowdhq/app" },
+          createdAt: "2026-07-25T18:42:00.000Z",
+        },
+      ],
+      counts: {
+        all: 1,
+        queued: 0,
+        initializing: 0,
+        running: 0,
+        awaiting_checks: 1,
+        ready: 0,
+        failed: 0,
+        cancelled: 0,
+        merged: 0,
+        abandoned: 0,
+        archived: 0,
+      },
+      pageInfo: { nextCursor: null, hasMore: false },
+    },
+  );
+
+  expect(output).toBe(
+    "ID                                    STATUS              REPOSITORY                    TITLE                                             CREATED                 \n" +
+      "33333333-3333-4333-8333-333333333333  Waiting for checks  toughcrowdhq/app              Add merge confidence                              2026-07-25T18:42:00.000Z\n",
+  );
 });

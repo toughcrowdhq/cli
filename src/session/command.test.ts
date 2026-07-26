@@ -25,8 +25,8 @@ const sessionListHelp =
     "",
     "Options:",
     '  --status <status>    filter by session status (choices: "all", "queued",',
-    '                       "initializing", "running", "ready", "failed",',
-    '                       "cancelled", "merged", "abandoned", "archived")',
+    '                       "initializing", "running", "awaiting_checks", "ready",',
+    '                       "failed", "cancelled", "merged", "abandoned", "archived")',
     "  --repo <owner/name>  filter by repository",
     "  --limit <count>      maximum sessions to return",
     "  --cursor <cursor>    continue from an opaque page cursor",
@@ -66,9 +66,9 @@ describe("session list command", () => {
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(
-      "ID                                    STATUS        REPOSITORY                    TITLE                                             CREATED                 \n" +
-        "11111111-1111-4111-8111-111111111111  running       acme/web                      Fix the flaky checkout test                       2026-07-18T20:01:02.000Z\n" +
-        "22222222-2222-4222-8222-222222222222  ready         (unavailable)                 (untitled)                                        2026-07-17T10:20:30.000Z\n" +
+      "ID                                    STATUS              REPOSITORY                    TITLE                                             CREATED                 \n" +
+        "11111111-1111-4111-8111-111111111111  running             acme/web                      Fix the flaky checkout test                       2026-07-18T20:01:02.000Z\n" +
+        "22222222-2222-4222-8222-222222222222  Waiting for checks  (unavailable)                 (untitled)                                        2026-07-17T10:20:30.000Z\n" +
         'Next page: toughcrowd session list --cursor "opaque.cursor/value+=?"\n',
     );
     expect(runtime.stderr.output).toBe("");
@@ -108,7 +108,7 @@ describe("session list command", () => {
         "session",
         "list",
         "--status",
-        "cancelled",
+        "awaiting_checks",
         "--repo",
         "acme/web app",
         "--limit",
@@ -122,7 +122,7 @@ describe("session list command", () => {
 
     expect(exitCode).toBe(0);
     expect(fetch.calls[0].url).toBe(
-      "http://localhost:3001/api/sessions?status=cancelled&repository=acme%2Fweb+app&limit=50&cursor=cursor+%2F%2B%3D%3F",
+      "http://localhost:3001/api/sessions?status=awaiting_checks&repository=acme%2Fweb+app&limit=50&cursor=cursor+%2F%2B%3D%3F",
     );
     expect(fetch.calls[0].authorization).toBe("Bearer tc_env_secret");
     expect(runtime.stderr.output).toBe("");
@@ -137,7 +137,7 @@ describe("session list command", () => {
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(
-      '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Fix the flaky checkout test","status":"running","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"},{"id":"22222222-2222-4222-8222-222222222222","title":null,"status":"ready","repository":null,"createdAt":"2026-07-17T10:20:30.000Z"}],"counts":{"all":2,"queued":0,"initializing":0,"running":1,"ready":1,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
+      '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Fix the flaky checkout test","status":"running","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"},{"id":"22222222-2222-4222-8222-222222222222","title":null,"status":"awaiting_checks","repository":null,"createdAt":"2026-07-17T10:20:30.000Z"}],"counts":{"all":2,"queued":0,"initializing":0,"running":1,"awaiting_checks":1,"ready":0,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
     );
     expect(runtime.stdout.output).not.toContain("initialPrompt");
     expect(runtime.stderr.output).toBe("");
@@ -172,7 +172,7 @@ describe("session list command", () => {
 
     expect(statusExitCode).toBe(2);
     expect(invalidStatus.stderr.output).toBe(
-      "error: option '--status <status>' argument 'cancelling' is invalid. Allowed choices are all, queued, initializing, running, ready, failed, cancelled, merged, abandoned, archived.\n",
+      "error: option '--status <status>' argument 'cancelling' is invalid. Allowed choices are all, queued, initializing, running, awaiting_checks, ready, failed, cancelled, merged, abandoned, archived.\n",
     );
     expect(limitExitCode).toBe(2);
     expect(invalidLimit.stderr.output).toBe(
@@ -353,12 +353,12 @@ function createSessionListResponse(options: { terminalPage?: boolean } = {}) {
       {
         id: "22222222-2222-4222-8222-222222222222",
         title: null,
-        status: "ready",
+        status: "awaiting_checks",
         repository: null,
         createdAt: "2026-07-17T10:20:30.000Z",
       },
     ],
-    counts: createCounts({ all: 2, running: 1, ready: 1 }),
+    counts: createCounts({ all: 2, running: 1, awaiting_checks: 1 }),
     pageInfo:
       options.terminalPage === true
         ? { nextCursor: null, hasMore: false }
@@ -372,6 +372,7 @@ function createCounts(overrides: Record<string, number> = {}) {
     queued: 0,
     initializing: 0,
     running: 0,
+    awaiting_checks: 0,
     ready: 0,
     failed: 0,
     cancelled: 0,

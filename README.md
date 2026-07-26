@@ -140,10 +140,12 @@ List the newest page of sessions visible to the authenticated user:
 ```sh
 toughcrowd session list
 toughcrowd session list --status running --repo acme/web
+toughcrowd session list --status awaiting_checks
 ```
 
 Human output includes each session's full ID so rows remain unambiguous and the
-identifier can be copied directly into other commands.
+identifier can be copied directly into other commands. Sessions with the
+`awaiting_checks` API status are shown as `Waiting for checks`.
 
 Use `--limit <count>` to request between 1 and 100 sessions. When another page
 exists, human output prints a follow-up command containing the opaque cursor;

@@ -25,8 +25,9 @@ const sessionListHelp =
     "",
     "Options:",
     '  --status <status>    filter by session status (choices: "all", "queued",',
-    '                       "initializing", "running", "awaiting_checks", "ready",',
-    '                       "failed", "cancelled", "merged", "abandoned", "archived")',
+    '                       "initializing", "running", "needs_input",',
+    '                       "awaiting_checks", "ready", "failed", "cancelled",',
+    '                       "merged", "abandoned", "archived")',
     "  --repo <owner/name>  filter by repository",
     "  --limit <count>      maximum sessions to return",
     "  --cursor <cursor>    continue from an opaque page cursor",
@@ -137,7 +138,7 @@ describe("session list command", () => {
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(
-      '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Fix the flaky checkout test","status":"running","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"},{"id":"22222222-2222-4222-8222-222222222222","title":null,"status":"awaiting_checks","repository":null,"createdAt":"2026-07-17T10:20:30.000Z"}],"counts":{"all":2,"queued":0,"initializing":0,"running":1,"awaiting_checks":1,"ready":0,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
+      '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Fix the flaky checkout test","status":"running","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"},{"id":"22222222-2222-4222-8222-222222222222","title":null,"status":"awaiting_checks","repository":null,"createdAt":"2026-07-17T10:20:30.000Z"}],"counts":{"all":2,"queued":0,"initializing":0,"running":1,"needs_input":0,"awaiting_checks":1,"ready":0,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
     );
     expect(runtime.stdout.output).not.toContain("initialPrompt");
     expect(runtime.stderr.output).toBe("");
@@ -172,7 +173,7 @@ describe("session list command", () => {
 
     expect(statusExitCode).toBe(2);
     expect(invalidStatus.stderr.output).toBe(
-      "error: option '--status <status>' argument 'cancelling' is invalid. Allowed choices are all, queued, initializing, running, awaiting_checks, ready, failed, cancelled, merged, abandoned, archived.\n",
+      "error: option '--status <status>' argument 'cancelling' is invalid. Allowed choices are all, queued, initializing, running, needs_input, awaiting_checks, ready, failed, cancelled, merged, abandoned, archived.\n",
     );
     expect(limitExitCode).toBe(2);
     expect(invalidLimit.stderr.output).toBe(
@@ -372,6 +373,7 @@ function createCounts(overrides: Record<string, number> = {}) {
     queued: 0,
     initializing: 0,
     running: 0,
+    needs_input: 0,
     awaiting_checks: 0,
     ready: 0,
     failed: 0,

@@ -84,7 +84,9 @@ function formatSession(session: SessionSummary): string {
 }
 
 function formatHumanSessionStatus(status: SessionSummary["status"]): string {
-  return status === "awaiting_checks" ? "Waiting for checks" : status;
+  if (status === "needs_input") return "Needs input";
+  if (status === "awaiting_checks") return "Waiting for checks";
+  return status;
 }
 
 function formatRow(values: {

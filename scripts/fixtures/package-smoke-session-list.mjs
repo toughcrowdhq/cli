@@ -72,6 +72,7 @@ const exitCode = await runCli(
           queued: 0,
           initializing: 0,
           running: 0,
+          needs_input: 0,
           awaiting_checks: 1,
           ready: 0,
           failed: 0,
@@ -106,7 +107,7 @@ assert(
 );
 assert(
   stdout.value ===
-    '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Package smoke session","status":"awaiting_checks","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"}],"counts":{"all":1,"queued":0,"initializing":0,"running":0,"awaiting_checks":1,"ready":0,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
+    '{"sessions":[{"id":"11111111-1111-4111-8111-111111111111","title":"Package smoke session","status":"awaiting_checks","repository":{"fullName":"acme/web"},"createdAt":"2026-07-18T20:01:02.000Z"}],"counts":{"all":1,"queued":0,"initializing":0,"running":0,"needs_input":0,"awaiting_checks":1,"ready":0,"failed":0,"cancelled":0,"merged":0,"abandoned":0,"archived":0},"pageInfo":{"nextCursor":null,"hasMore":false}}\n',
   "installed session list returned the wrong JSON document",
 );
 assert(

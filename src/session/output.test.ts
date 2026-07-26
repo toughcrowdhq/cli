@@ -52,6 +52,7 @@ it("keeps human session rows bounded and strips terminal controls", () => {
         queued: 0,
         initializing: 0,
         running: 1,
+        needs_input: 0,
         awaiting_checks: 0,
         ready: 0,
         failed: 0,
@@ -79,6 +80,7 @@ it("prints full IDs when their leading UUID components collide", () => {
     queued: 0,
     initializing: 0,
     running: 2,
+    needs_input: 0,
     awaiting_checks: 0,
     ready: 0,
     failed: 0,
@@ -140,12 +142,20 @@ it("renders awaiting_checks as Waiting for checks", () => {
           repository: { fullName: "toughcrowdhq/app" },
           createdAt: "2026-07-25T18:42:00.000Z",
         },
+        {
+          id: "44444444-4444-4444-8444-444444444444",
+          title: "Choose a migration strategy",
+          status: "needs_input",
+          repository: { fullName: "toughcrowdhq/app" },
+          createdAt: "2026-07-25T18:43:00.000Z",
+        },
       ],
       counts: {
-        all: 1,
+        all: 2,
         queued: 0,
         initializing: 0,
         running: 0,
+        needs_input: 1,
         awaiting_checks: 1,
         ready: 0,
         failed: 0,
@@ -160,6 +170,7 @@ it("renders awaiting_checks as Waiting for checks", () => {
 
   expect(output).toBe(
     "ID                                    STATUS              REPOSITORY                    TITLE                                             CREATED                 \n" +
-      "33333333-3333-4333-8333-333333333333  Waiting for checks  toughcrowdhq/app              Add merge confidence                              2026-07-25T18:42:00.000Z\n",
+      "33333333-3333-4333-8333-333333333333  Waiting for checks  toughcrowdhq/app              Add merge confidence                              2026-07-25T18:42:00.000Z\n" +
+      "44444444-4444-4444-8444-444444444444  Needs input         toughcrowdhq/app              Choose a migration strategy                       2026-07-25T18:43:00.000Z\n",
   );
 });

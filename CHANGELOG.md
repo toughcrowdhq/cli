@@ -1,5 +1,11 @@
 # @toughcrowd/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- d667850: Support filtering, decoding, and human-readable rendering for sessions with the `needs_input` and `awaiting_checks` statuses.
+
 ## 0.3.0
 
 ### Minor Changes

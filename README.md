@@ -1,3 +1,5 @@
+hi there
+
 # Tough Crowd CLI
 
 The public command-line client for Tough Crowd, which supervises coding-agent

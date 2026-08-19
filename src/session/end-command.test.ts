@@ -75,6 +75,7 @@ describe("session end commands", () => {
         url: `https://api.toughcrowd.dev/api/sessions/${sessionId}/cancel`,
         method: "POST",
         authorization: "Bearer tc_secret",
+        idempotencyKey: "session-end-idempotency",
         client: "@toughcrowd/cli/0.4.0-test",
         body: undefined,
       },
@@ -180,6 +181,7 @@ interface TestFetchCall {
   url: string;
   method: string | undefined;
   authorization: string | null;
+  idempotencyKey: string | null;
   client: string | null;
   body: BodyInit | null | undefined;
 }
@@ -197,7 +199,15 @@ function createAuthenticatedRuntime(fetch: FetchLike) {
 
 function createRuntime(
   overrides: Partial<
-    Pick<CliRuntime, "version" | "signal" | "env" | "credentialStore" | "fetch">
+    Pick<
+      CliRuntime,
+      | "version"
+      | "signal"
+      | "env"
+      | "credentialStore"
+      | "fetch"
+      | "createIdempotencyKey"
+    >
   > = {},
 ): CliRuntime & { stdout: CapturedWritable; stderr: CapturedWritable } {
   return {
@@ -209,6 +219,8 @@ function createRuntime(
     credentialStore:
       overrides.credentialStore ?? createMemoryCredentialStore({}),
     fetch: overrides.fetch,
+    createIdempotencyKey:
+      overrides.createIdempotencyKey ?? (() => "session-end-idempotency"),
   };
 }
 
@@ -243,6 +255,7 @@ function createFetch(
       url: url.toString(),
       method: init.method,
       authorization: headers.get("authorization"),
+      idempotencyKey: headers.get("idempotency-key"),
       client: headers.get("x-toughcrowd-client"),
       body: init.body,
     });

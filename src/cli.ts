@@ -245,11 +245,20 @@ function createSessionEndCommand(
     .allowExcessArguments(false)
     .allowUnknownOption(false)
     .action(async (sessionId: string, options: { json?: boolean }) => {
-      await end(createSessionRuntime(runtime), {
-        action,
-        sessionId,
-        json: options.json === true,
-      });
+      await end(
+        {
+          ...createSessionRuntime(runtime),
+          createIdempotencyKey: () =>
+            runtime.createIdempotencyKey != null
+              ? runtime.createIdempotencyKey()
+              : randomUUID(),
+        },
+        {
+          action,
+          sessionId,
+          json: options.json === true,
+        },
+      );
     });
 
   return configureNestedCommand(command, runtime);

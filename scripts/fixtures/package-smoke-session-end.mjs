@@ -10,6 +10,7 @@ const apiOrigin = "https://api.toughcrowd.dev";
 const apiKey = "tc_package_end_secret";
 const sessionId = "44444444-4444-4444-8444-444444444444";
 const fetchCalls = [];
+const idempotencyKeys = ["package-cancel-key", "package-abandon-key"];
 
 for (const action of ["cancel", "abandon"]) {
   const stdout = createOutput();
@@ -32,12 +33,18 @@ for (const action of ["cancel", "abandon"]) {
         throw new Error("session lifecycle commands must not write keyring");
       },
     },
+    createIdempotencyKey() {
+      const key = idempotencyKeys.shift();
+      assert(key != null, "session lifecycle command generated extra keys");
+      return key;
+    },
     async fetch(url, init) {
       const headers = new Headers(init.headers);
       fetchCalls.push({
         url: String(url),
         method: init.method,
         authorization: headers.get("authorization"),
+        idempotencyKey: headers.get("idempotency-key"),
         client: headers.get("x-toughcrowd-client"),
         body: init.body,
       });
@@ -71,10 +78,12 @@ assert(
 assert(
   JSON.stringify(fetchCalls) ===
     JSON.stringify(
-      ["cancel", "abandon"].map((action) => ({
+      ["cancel", "abandon"].map((action, index) => ({
         url: `${apiOrigin}/api/sessions/${sessionId}/${action}`,
         method: "POST",
         authorization: `Bearer ${apiKey}`,
+        idempotencyKey:
+          index === 0 ? "package-cancel-key" : "package-abandon-key",
         client: `@toughcrowd/cli/${cliVersion}`,
       })),
     ),

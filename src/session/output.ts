@@ -1,9 +1,11 @@
 import type {
   CreatedSession,
   CreateSessionResponse,
+  SessionActionResult,
   SessionList,
   SessionSummary,
 } from "./types.js";
+import type { SessionEndAction } from "./api.js";
 
 const columnWidths = {
   id: 36,
@@ -69,6 +71,27 @@ export function printHumanCreatedSession(
 export function printJsonCreatedSession(
   stdout: { write(value: string): unknown },
   result: CreateSessionResponse,
+): void {
+  stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+export function printHumanSessionAction(
+  stdout: { write(value: string): unknown },
+  result: SessionActionResult,
+  action: SessionEndAction,
+): void {
+  stdout.write(
+    action === "cancel"
+      ? "Session cancellation requested\n"
+      : "Session abandoned\n",
+  );
+  stdout.write(`ID: ${result.session.id}\n`);
+  stdout.write(`Status: ${formatHumanSessionStatus(result.session.status)}\n`);
+}
+
+export function printJsonSessionAction(
+  stdout: { write(value: string): unknown },
+  result: SessionActionResult,
 ): void {
   stdout.write(`${JSON.stringify(result)}\n`);
 }

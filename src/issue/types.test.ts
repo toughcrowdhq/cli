@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  decodeDetachedRelationshipResponse,
   decodeIssueDetail,
   decodeIssueList,
   decodeIssueSummary,
+  decodeRetryResponse,
+  decodeUnlinkResponse,
 } from "./types.js";
 
 const issueId = "11111111-1111-4111-8111-111111111111";
@@ -48,6 +51,14 @@ describe("issue response decoding", () => {
         deployedUnverified: empty,
       }),
     ).toThrow("issue summary set is inconsistent");
+  });
+
+  it("accepts zero-count mutation responses", () => {
+    expect(decodeDetachedRelationshipResponse({ detached: 0 })).toEqual({
+      detached: 0,
+    });
+    expect(decodeRetryResponse({ retried: 0 })).toEqual({ retried: 0 });
+    expect(decodeUnlinkResponse({ unlinked: 0 })).toEqual({ unlinked: 0 });
   });
 
   it("sanitizes issue detail instead of forwarding arbitrary event payloads", () => {

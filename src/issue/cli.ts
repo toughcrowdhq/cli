@@ -109,7 +109,7 @@ function createShowCommand(runtime: CreateIssueRuntime): Command {
 }
 
 function createUpdateCommand(runtime: CreateIssueRuntime): Command {
-  return command("update", "Update an issue")
+  const updateCommand = command("update", "Update an issue")
     .argument("<issue-id>", "issue ID")
     .requiredOption(
       "--issue-version <number>",
@@ -130,8 +130,8 @@ function createUpdateCommand(runtime: CreateIssueRuntime): Command {
         },
       ) => {
         if (options.title == null && options.description == null) {
-          throw new InvalidArgumentError(
-            "at least one of --title or --description is required",
+          updateCommand.error(
+            "error: at least one of --title or --description is required",
           );
         }
         await updateIssueCommand(runtime, {
@@ -143,6 +143,7 @@ function createUpdateCommand(runtime: CreateIssueRuntime): Command {
         });
       },
     );
+  return updateCommand;
 }
 
 function createResolveCommand(runtime: CreateIssueRuntime): Command {

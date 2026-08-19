@@ -236,7 +236,7 @@ export function decodeDetachedRelationshipResponse(
   value: unknown,
 ): DetachedRelationshipResponse {
   if (!isRecord(value)) throw new TypeError("detach response is invalid");
-  return { detached: readPositiveInteger(value.detached, "detached") };
+  return { detached: readNonnegativeInteger(value.detached, "detached") };
 }
 
 export function decodeVerificationResponse(
@@ -256,12 +256,12 @@ export function decodeGitHubLinkResponse(value: unknown): GitHubLinkResponse {
 
 export function decodeRetryResponse(value: unknown): CountResponse {
   if (!isRecord(value)) throw new TypeError("retry response is invalid");
-  return { retried: readPositiveInteger(value.retried, "retried") };
+  return { retried: readNonnegativeInteger(value.retried, "retried") };
 }
 
 export function decodeUnlinkResponse(value: unknown): CountResponse {
   if (!isRecord(value)) throw new TypeError("unlink response is invalid");
-  return { unlinked: readPositiveInteger(value.unlinked, "unlinked") };
+  return { unlinked: readNonnegativeInteger(value.unlinked, "unlinked") };
 }
 
 export function decodeIssueSummary(value: unknown): IssueSummary {

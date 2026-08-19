@@ -254,6 +254,23 @@ describe("issue commands", () => {
     expect(fetch.calls).toEqual([]);
   });
 
+  it("prints a diagnostic when update has no changed fields", async () => {
+    const fetch = createIssueFetch();
+    const runtime = createAuthenticatedRuntime(fetch);
+
+    const exitCode = await runCli(
+      ["issue", "update", issueId, "--issue-version", "1"],
+      runtime,
+    );
+
+    expect(exitCode).toBe(2);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toBe(
+      "error: at least one of --title or --description is required\n",
+    );
+    expect(fetch.calls).toEqual([]);
+  });
+
   it("fails before a request when no credential is available", async () => {
     const runtime = createRuntime();
 

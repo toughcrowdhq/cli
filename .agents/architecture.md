@@ -320,12 +320,41 @@ Meanings:
 - `archive` removes a completed session from the active working set without
   treating it as deletion.
 
+## Issue Command Surface
+
+`issue` is the public namespace for Tough Crowd-owned defect records. It is
+distinct from a GitHub issue, which is an optional external link. The supported
+command family follows the server's optimistic-concurrency contract:
+
+```text
+toughcrowd issue list
+toughcrowd issue new <description> --repository-id <repository-id>
+toughcrowd issue show <issue-id>
+toughcrowd issue update <issue-id> --issue-version <version>
+toughcrowd issue resolve <issue-id> --issue-version <version> --disposition <disposition>
+toughcrowd issue reopen <issue-id> --issue-version <version>
+toughcrowd issue verify <issue-id> --issue-version <version> --result <result> --environment <name>
+toughcrowd issue attach-session <issue-id> <session-id> --issue-version <version> --role <role>
+toughcrowd issue detach-session <issue-id> <session-id> --issue-version <version>
+toughcrowd issue mirror-github <issue-id>
+toughcrowd issue adopt-github <issue-id> [GitHub identity options]
+toughcrowd issue retry-github <issue-id>
+toughcrowd issue unlink-github <issue-id>
+toughcrowd issue summary
+```
+
+Use `--issue-version`, not `--version`, for mutation preconditions because the
+root `--version` option is reserved for printing the CLI package version.
+External tracker actions stay explicitly named and never make GitHub identity
+the local issue identity.
+
 ## Likely Future Namespaces
 
 The likely long-term top-level command namespaces are:
 
 ```text
 session
+issue
 repo
 profile
 auth

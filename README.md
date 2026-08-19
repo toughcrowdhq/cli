@@ -161,6 +161,23 @@ For automation, `--json` prints one validated document containing `sessions`,
 toughcrowd session list --limit 25 --json
 ```
 
+Stop active work with the full session ID shown by `session list`:
+
+```sh
+toughcrowd session cancel <session-id>
+```
+
+Once a session with a pull request is review-ready, abandon it explicitly when
+the generated changes will not be shipped:
+
+```sh
+toughcrowd session abandon <session-id>
+```
+
+Both commands accept `--json` for a bounded response containing only the
+session ID and resulting status. They do not select a recent session
+implicitly or prompt interactively, so scripts always act on an explicit ID.
+
 ## Issues
 
 Capture and inspect Tough Crowd issues with the singular `issue` namespace:

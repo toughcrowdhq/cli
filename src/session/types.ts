@@ -72,6 +72,13 @@ export interface CreateSessionResponse {
   session: CreatedSession;
 }
 
+export interface SessionActionResult {
+  session: {
+    id: string;
+    status: SessionStatus;
+  };
+}
+
 const maximumPageSize = 100;
 const maximumTitleLength = 500;
 const maximumRepositoryNameLength = 255;
@@ -132,6 +139,24 @@ export function decodeCreateSessionResponse(
       title,
     },
   };
+}
+
+export function decodeSessionActionResult(value: unknown): SessionActionResult {
+  if (!isRecord(value) || !isRecord(value.session)) {
+    throw new TypeError("session action response is invalid");
+  }
+
+  const id = readUuid(value.session.id);
+  const status = readSessionStatus(value.session.status);
+  if (id == null || status == null) {
+    throw new TypeError("session action response is invalid");
+  }
+
+  return { session: { id, status } };
+}
+
+export function isSessionId(value: string): boolean {
+  return readUuid(value) != null;
 }
 
 function decodeSessionSummary(value: unknown): SessionSummary {

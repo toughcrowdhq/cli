@@ -1,11 +1,15 @@
 import { requestJson, type RequestJsonOptions } from "../api/request.js";
 import {
   decodeCreateSessionResponse,
+  decodeSessionActionResult,
   decodeSessionList,
   type CreateSessionResponse,
+  type SessionActionResult,
   type SessionList,
   type SessionStatusFilter,
 } from "./types.js";
+
+export type SessionEndAction = "cancel" | "abandon";
 
 export interface CreateSessionRequest {
   prompt: string;
@@ -48,6 +52,33 @@ export function createSession(
     timers: options.timers,
     metadata: { cliVersion: options.version },
     decode: decodeCreateSessionResponse,
+  });
+}
+
+export interface EndSessionOptions {
+  action: SessionEndAction;
+  sessionId: string;
+  apiOrigin: string;
+  authorization: string;
+  signal: AbortSignal;
+  version: string;
+  fetch?: RequestJsonOptions<SessionActionResult>["fetch"];
+  timers?: RequestJsonOptions<SessionActionResult>["timers"];
+}
+
+export function endSession(
+  options: EndSessionOptions,
+): Promise<SessionActionResult> {
+  return requestJson({
+    origin: options.apiOrigin,
+    method: "POST",
+    path: `/api/sessions/${options.sessionId}/${options.action}`,
+    authorization: options.authorization,
+    signal: options.signal,
+    fetch: options.fetch,
+    timers: options.timers,
+    metadata: { cliVersion: options.version },
+    decode: decodeSessionActionResult,
   });
 }
 

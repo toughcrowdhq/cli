@@ -27,7 +27,8 @@ import { IssueCommandError } from "./issue/errors.js";
 import { create, type CreateSessionCommandOptions } from "./session/create.js";
 import { list, type ListSessionCommandOptions } from "./session/list.js";
 import { SessionCommandError } from "./session/errors.js";
-import { sessionStatusFilters } from "./session/types.js";
+import { end } from "./session/end.js";
+import { isSessionId, sessionStatusFilters } from "./session/types.js";
 import type { SessionRuntime } from "./session/runtime.js";
 
 export interface CliWritable {
@@ -139,7 +140,9 @@ function createRootProgram(runtime: CliRuntime): Command {
     .command("session")
     .description("Work with Tough Crowd sessions")
     .addCommand(createSessionListCommand(runtime))
-    .addCommand(createSessionNewCommand(runtime));
+    .addCommand(createSessionNewCommand(runtime))
+    .addCommand(createSessionEndCommand(runtime, "cancel"))
+    .addCommand(createSessionEndCommand(runtime, "abandon"));
 
   program.addCommand(
     configureCommandTree(
@@ -227,6 +230,31 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
   return configureNestedCommand(command, runtime);
 }
 
+function createSessionEndCommand(
+  runtime: CliRuntime,
+  action: "cancel" | "abandon",
+): Command {
+  const command = new Command(action)
+    .description(
+      action === "cancel"
+        ? "Cancel an active session"
+        : "Abandon an unshipped session",
+    )
+    .argument("<session-id>", "session ID", parseSessionId)
+    .option("--json", "print machine-readable JSON")
+    .allowExcessArguments(false)
+    .allowUnknownOption(false)
+    .action(async (sessionId: string, options: { json?: boolean }) => {
+      await end(createSessionRuntime(runtime), {
+        action,
+        sessionId,
+        json: options.json === true,
+      });
+    });
+
+  return configureNestedCommand(command, runtime);
+}
+
 function configureNestedCommand(
   command: Command,
   runtime: CliRuntime,
@@ -275,6 +303,13 @@ function parseListLimit(value: string): number {
   }
 
   return limit;
+}
+
+function parseSessionId(value: string): string {
+  if (!isSessionId(value)) {
+    throw new InvalidArgumentError("must be a UUID");
+  }
+  return value;
 }
 
 function createAuthLoginCommand(runtime: CliRuntime): Command {

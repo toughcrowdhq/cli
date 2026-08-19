@@ -106,6 +106,11 @@ try {
     ["session", "new", "--help"],
     { encoding: "utf8" },
   );
+  const sessionCancelHelpOutput = execFileSync(
+    executable,
+    ["session", "cancel", "--help"],
+    { encoding: "utf8" },
+  );
   const installedPackageDirectory =
     process.platform === "win32"
       ? resolve(installationPrefix, "node_modules", "@toughcrowd", "cli")
@@ -143,6 +148,18 @@ try {
       resolve(
         packageDirectory,
         "scripts/fixtures/package-smoke-session-new.mjs",
+      ),
+      resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
+  const sessionEndSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(
+        packageDirectory,
+        "scripts/fixtures/package-smoke-session-end.mjs",
       ),
       resolve(installedPackageDirectory, "dist/cli.js"),
       metadata.version,
@@ -189,15 +206,24 @@ Commands:
   );
   assert(
     sessionHelpOutput.includes(
-      "  new [options] <prompt>  Create a new coding-agent session\n",
+      "  new [options] <prompt>          Create a new coding-agent session\n",
     ) &&
+      sessionHelpOutput.includes(
+        "  cancel [options] <session-id>   Cancel an active session\n",
+      ) &&
+      sessionHelpOutput.includes(
+        "  abandon [options] <session-id>  Abandon an unshipped session\n",
+      ) &&
       sessionNewHelpOutput.includes(
         "Usage: toughcrowd session new [options] <prompt>\n",
       ) &&
       sessionNewHelpOutput.includes(
         "  --profile <profile-id>  Agent Profile to use\n",
+      ) &&
+      sessionCancelHelpOutput.includes(
+        "Usage: toughcrowd session cancel [options] <session-id>\n",
       ),
-    "installed CLI returned the wrong session-new help output",
+    "installed CLI returned the wrong session help output",
   );
   assert(
     authSmokeOutput === "Verified installed browser login\n",
@@ -210,6 +236,10 @@ Commands:
   assert(
     sessionNewSmokeOutput === "Verified installed session new\n",
     "installed CLI failed the authenticated session-new smoke test",
+  );
+  assert(
+    sessionEndSmokeOutput === "Verified installed session end\n",
+    "installed CLI failed the authenticated session-end smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

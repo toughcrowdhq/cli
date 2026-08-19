@@ -206,8 +206,14 @@ Commands:
   );
   assert(
     sessionHelpOutput.includes(
-      "  new [options] <prompt>  Create a new coding-agent session\n",
+      "  new [options] <prompt>          Create a new coding-agent session\n",
     ) &&
+      sessionHelpOutput.includes(
+        "  cancel [options] <session-id>   Cancel an active session\n",
+      ) &&
+      sessionHelpOutput.includes(
+        "  abandon [options] <session-id>  Abandon an unshipped session\n",
+      ) &&
       sessionNewHelpOutput.includes(
         "Usage: toughcrowd session new [options] <prompt>\n",
       ) &&
@@ -217,7 +223,7 @@ Commands:
       sessionCancelHelpOutput.includes(
         "Usage: toughcrowd session cancel [options] <session-id>\n",
       ),
-    "installed CLI returned the wrong session-new help output",
+    "installed CLI returned the wrong session help output",
   );
   assert(
     authSmokeOutput === "Verified installed browser login\n",

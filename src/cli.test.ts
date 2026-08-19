@@ -29,6 +29,7 @@ Options:
 Commands:
   auth            Manage Tough Crowd authentication
   session         Work with Tough Crowd sessions
+  issue           Work with Tough Crowd issues
   help [command]  display help for command
 `;
 

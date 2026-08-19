@@ -3,8 +3,7 @@
 The public command-line client for Tough Crowd, which supervises coding-agent
 work in cloud sandboxes and helps people decide what is safe to ship.
 
-The CLI provides API-key authentication and initial session list and creation
-workflows.
+The CLI provides API-key authentication plus session and issue workflows.
 
 ## Install
 
@@ -63,6 +62,7 @@ Options:
 Commands:
   auth            Manage Tough Crowd authentication
   session         Work with Tough Crowd sessions
+  issue           Work with Tough Crowd issues
   help [command]  display help for command
 ```
 
@@ -160,6 +160,46 @@ For automation, `--json` prints one validated document containing `sessions`,
 ```sh
 toughcrowd session list --limit 25 --json
 ```
+
+## Issues
+
+Capture and inspect Tough Crowd issues with the singular `issue` namespace:
+
+```sh
+toughcrowd issue new "Production checkout fails for saved cards" \
+  --repository-id 22222222-2222-4222-8222-222222222222
+toughcrowd issue list --state open
+toughcrowd issue show <issue-id>
+toughcrowd issue summary --created-from 2026-08-01T00:00:00.000Z
+```
+
+Issue updates use optimistic concurrency. Pass the current value shown by
+`issue show` or `issue list` with `--issue-version`:
+
+```sh
+toughcrowd issue update <issue-id> --issue-version 3 --title "Checkout retry failure"
+toughcrowd issue resolve <issue-id> --issue-version 4 --disposition fixed
+toughcrowd issue reopen <issue-id> --issue-version 5
+toughcrowd issue verify <issue-id> --issue-version 5 \
+  --result passed --environment production
+```
+
+Link delivery work and optional GitHub issue synchronization explicitly:
+
+```sh
+toughcrowd issue attach-session <issue-id> <session-id> \
+  --issue-version 2 --role implemented
+toughcrowd issue detach-session <issue-id> <session-id> --issue-version 3
+toughcrowd issue mirror-github <issue-id>
+toughcrowd issue adopt-github <issue-id> \
+  --scope-id <github-repository-id> --external-id <github-issue-id> \
+  --key '#42' --url https://github.com/acme/web/issues/42
+toughcrowd issue retry-github <issue-id>
+toughcrowd issue unlink-github <issue-id>
+```
+
+Every bounded issue command accepts `--json`. API responses are validated and
+projected to documented client-facing fields before they are printed.
 
 ## Releases
 

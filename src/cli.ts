@@ -22,6 +22,8 @@ import {
   type AuthorizationSecrets,
 } from "./auth/pkce.js";
 import { readGitOriginUrl } from "./git.js";
+import { createIssueCommandGroup } from "./issue/cli.js";
+import { IssueCommandError } from "./issue/errors.js";
 import { create, type CreateSessionCommandOptions } from "./session/create.js";
 import { list, type ListSessionCommandOptions } from "./session/list.js";
 import { SessionCommandError } from "./session/errors.js";
@@ -93,6 +95,11 @@ export async function runCli(
       return error.exitCode;
     }
 
+    if (error instanceof IssueCommandError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     runtime.stderr.write(`${formatUnexpectedError(error)}\n`);
     return unexpectedFailureExitCode;
   } finally {
@@ -133,6 +140,19 @@ function createRootProgram(runtime: CliRuntime): Command {
     .description("Work with Tough Crowd sessions")
     .addCommand(createSessionListCommand(runtime))
     .addCommand(createSessionNewCommand(runtime));
+
+  program.addCommand(
+    configureCommandTree(
+      createIssueCommandGroup({
+        ...createSessionRuntime(runtime),
+        createIdempotencyKey: () =>
+          runtime.createIdempotencyKey != null
+            ? runtime.createIdempotencyKey()
+            : randomUUID(),
+      }),
+      runtime,
+    ),
+  );
 
   return program;
 }
@@ -223,6 +243,12 @@ function configureNestedCommand(
     },
   });
 
+  return command;
+}
+
+function configureCommandTree(command: Command, runtime: CliRuntime): Command {
+  configureNestedCommand(command, runtime);
+  for (const child of command.commands) configureCommandTree(child, runtime);
   return command;
 }
 

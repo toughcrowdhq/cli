@@ -154,7 +154,7 @@ describe("session end commands", () => {
     expect(runtime.stderr.output).not.toContain("debug");
   });
 
-  it("rejects malformed success responses", async () => {
+  it("handles an unfamiliar success status", async () => {
     const runtime = createAuthenticatedRuntime(
       createFetch(() =>
         jsonResponse({ session: { id: sessionId, status: "destroyed" } }),
@@ -163,11 +163,14 @@ describe("session end commands", () => {
 
     const exitCode = await runCli(["session", "cancel", sessionId], runtime);
 
-    expect(exitCode).toBe(1);
-    expect(runtime.stdout.output).toBe("");
-    expect(runtime.stderr.output).toBe(
-      "Could not cancel session: the Tough Crowd API returned an invalid response.\n",
+    expect(exitCode).toBe(0);
+    expect(runtime.stdout.output).toBe(
+      `Session cancellation requested
+ID: ${sessionId}
+Status: Unknown status (destroyed)
+`,
     );
+    expect(runtime.stderr.output).toBe("");
   });
 });
 

@@ -5,6 +5,7 @@ import type {
   SessionList,
   SessionSummary,
 } from "./types.js";
+import { sessionStatuses } from "./types.js";
 import type { SessionEndAction } from "./api.js";
 
 const columnWidths = {
@@ -99,17 +100,21 @@ export function printJsonSessionAction(
 function formatSession(session: SessionSummary): string {
   return formatRow({
     id: session.id,
-    status: formatHumanSessionStatus(session.status),
+    status: formatHumanSessionStatus(session.status, true),
     repository: session.repository?.fullName ?? "(unavailable)",
     title: session.title ?? "(untitled)",
     createdAt: session.createdAt,
   });
 }
 
-function formatHumanSessionStatus(status: SessionSummary["status"]): string {
+function formatHumanSessionStatus(
+  status: SessionSummary["status"],
+  compact = false,
+): string {
   if (status === "needs_input") return "Needs input";
   if (status === "awaiting_checks") return "Waiting for checks";
-  return status;
+  if ((sessionStatuses as readonly string[]).includes(status)) return status;
+  return compact ? status : `Unknown status (${status})`;
 }
 
 function formatRow(values: {

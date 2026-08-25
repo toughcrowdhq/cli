@@ -1,6 +1,42 @@
 import { expect, it } from "vitest";
 import { printHumanCreatedSession, printHumanSessionList } from "./output.js";
 
+it("labels unfamiliar statuses without failing to render the session", () => {
+  let output = "";
+
+  printHumanSessionList(
+    { write: (value) => (output += value) },
+    {
+      sessions: [
+        {
+          id: "018f57c6-0dc7-7c37-8f1b-1884d4920c9c",
+          status: "validating",
+          repository: { fullName: "acme/web" },
+          title: "Validate generated changes",
+          createdAt: "2025-01-01T00:00:00.000Z",
+        },
+      ],
+      counts: {
+        all: 1,
+        queued: 0,
+        initializing: 0,
+        running: 0,
+        needs_input: 0,
+        awaiting_checks: 0,
+        ready: 0,
+        failed: 0,
+        cancelled: 0,
+        merged: 0,
+        abandoned: 0,
+        archived: 0,
+      },
+      pageInfo: { nextCursor: null, hasMore: false },
+    },
+  );
+
+  expect(output).toContain("validating");
+});
+
 it("keeps created-session fields bounded and strips terminal controls", () => {
   let output = "";
 

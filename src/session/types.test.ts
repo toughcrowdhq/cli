@@ -40,7 +40,10 @@ describe("decodeCreateSessionResponse", () => {
     ["a non-object envelope", null],
     ["a missing session", {}],
     ["a malformed ID", createCreatedSessionResponse({ id: "not-a-uuid" })],
-    ["an unknown status", createCreatedSessionResponse({ status: "waiting" })],
+    [
+      "a status containing terminal control characters",
+      createCreatedSessionResponse({ status: "waiting\nfor-review" }),
+    ],
     [
       "a missing repository",
       createCreatedSessionResponse({ repository: null }),
@@ -59,6 +62,14 @@ describe("decodeCreateSessionResponse", () => {
 });
 
 describe("decodeSessionList", () => {
+  it("preserves an unfamiliar, safe session status", () => {
+    expect(
+      decodeSessionList(withSession({ status: "validating" })),
+    ).toMatchObject({
+      sessions: [{ status: "validating" }],
+    });
+  });
+
   it("decodes only the bounded public list contract", () => {
     const result = decodeSessionList({
       sessions: [
@@ -195,7 +206,10 @@ describe("decodeSessionList", () => {
       },
     ],
     ["a malformed session ID", withSession({ id: "not-a-uuid" })],
-    ["an unknown session status", withSession({ status: "waiting" })],
+    [
+      "a session status containing terminal control characters",
+      withSession({ status: "waiting\nfor-review" }),
+    ],
     ["an overlong title", withSession({ title: "t".repeat(501) })],
     [
       "a noncanonical timestamp",

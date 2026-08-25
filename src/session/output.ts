@@ -114,7 +114,7 @@ function formatHumanSessionStatus(
   if (status === "needs_input") return "Needs input";
   if (status === "awaiting_checks") return "Waiting for checks";
   if ((sessionStatuses as readonly string[]).includes(status)) return status;
-  return compact ? "Unknown" : `Unknown status (${status})`;
+  return compact ? status : `Unknown status (${status})`;
 }
 
 function formatRow(values: {

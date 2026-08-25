@@ -34,7 +34,7 @@ it("labels unfamiliar statuses without failing to render the session", () => {
     },
   );
 
-  expect(output).toContain("Unknown");
+  expect(output).toContain("validating");
 });
 
 it("keeps created-session fields bounded and strips terminal controls", () => {

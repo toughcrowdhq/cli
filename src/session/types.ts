@@ -13,7 +13,14 @@ export const sessionStatuses = [
   "archived",
 ] as const;
 
-export type SessionStatus = (typeof sessionStatuses)[number];
+export type KnownSessionStatus = (typeof sessionStatuses)[number];
+
+/**
+ * The API can add session statuses independently of this CLI. Preserve an
+ * unfamiliar, safe status so callers can still inspect the session instead of
+ * rejecting the entire response.
+ */
+export type SessionStatus = KnownSessionStatus | (string & {});
 
 export const sessionStatusFilters = [
   "all",
@@ -246,10 +253,8 @@ function decodeSessionListPageInfo(
 }
 
 function readSessionStatus(value: unknown): SessionStatus | null {
-  return typeof value === "string" &&
-    (sessionStatuses as readonly string[]).includes(value)
-    ? (value as SessionStatus)
-    : null;
+  const status = readNonemptyString(value, 100);
+  return status != null && !containsControlCharacter(status) ? status : null;
 }
 
 function readUuid(value: unknown): string | null {

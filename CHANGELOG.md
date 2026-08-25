@@ -1,5 +1,16 @@
 # @toughcrowd/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- 4230e0f: Add `session cancel` and `session abandon` commands for explicitly ending coding-agent sessions by ID.
+- ec7316e: Add issue capture, inspection, lifecycle, verification, session-linking, GitHub-linking, and summary commands backed by the Tough Crowd Issues API.
+
+### Patch Changes
+
+- d40a562: Handle unfamiliar session statuses without rejecting otherwise valid API responses.
+
 ## 0.4.0
 
 ### Minor Changes

@@ -17,6 +17,7 @@ export interface CreateSessionRequest {
   agentProfile?: string;
   baseBranch?: string;
   title?: string;
+  issueId?: string;
 }
 
 export interface CreateSessionOptions extends CreateSessionRequest {
@@ -46,6 +47,7 @@ export function createSession(
         : {}),
       ...(options.baseBranch != null ? { baseBranch: options.baseBranch } : {}),
       ...(options.title != null ? { title: options.title } : {}),
+      ...(options.issueId != null ? { issueId: options.issueId } : {}),
     },
     signal: options.signal,
     fetch: options.fetch,

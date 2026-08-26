@@ -25,6 +25,7 @@ export interface CreateSessionCommandOptions {
   profile?: string;
   baseBranch?: string;
   title?: string;
+  issueId?: string;
   json?: boolean;
 }
 
@@ -52,6 +53,7 @@ export async function create(
       agentProfile: inputs.agentProfile?.value,
       baseBranch: inputs.baseBranch,
       title: inputs.title,
+      issueId: options.issueId,
     });
 
     if (options.json === true) {

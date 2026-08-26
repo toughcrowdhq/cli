@@ -135,6 +135,15 @@ TOUGHCROWD_AGENT_PROFILE=codex-cli-default \
 toughcrowd session new "Fix the flaky checkout test" --json
 ```
 
+To associate new coding-agent work with a Tough Crowd issue before it is
+queued, pass that issue's full ID:
+
+```sh
+toughcrowd session new "Fix the saved-card checkout failure" \
+  --repo toughcrowdhq/app \
+  --issue-id 11111111-1111-4111-8111-111111111111
+```
+
 List the newest page of sessions visible to the authenticated user:
 
 ```sh

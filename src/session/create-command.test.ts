@@ -16,6 +16,7 @@ const sessionNewHelp =
     "  --profile <profile-id>  Agent Profile to use",
     "  --base-branch <branch>  base branch for generated changes",
     "  --title <title>         session title",
+    "  --issue-id <issue-id>   relate the new session to an issue",
     "  --json                  print machine-readable JSON",
     "  -h, --help              display help for command",
   ].join("\n") + "\n";
@@ -162,6 +163,69 @@ describe("session new command", () => {
       }),
     );
     expect(runtime.stderr.output).toBe("");
+  });
+
+  it("relates a new session to an issue", async () => {
+    const fetch = createFetch(() =>
+      jsonResponse(createSessionResponse({ title: null }), 201),
+    );
+    const runtime = createRuntime({
+      env: { TOUGHCROWD_API_KEY: "tc_secret" },
+      fetch,
+    });
+
+    const exitCode = await runCli(
+      [
+        "session",
+        "new",
+        "Fix checkout",
+        "--repo",
+        "acme/web",
+        "--issue-id",
+        "11111111-1111-4111-8111-111111111111",
+        "--json",
+      ],
+      runtime,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(fetch.calls[0].body).toBe(
+      JSON.stringify({
+        prompt: "Fix checkout",
+        repository: "acme/web",
+        issueId: "11111111-1111-4111-8111-111111111111",
+      }),
+    );
+    expect(runtime.stderr.output).toBe("");
+  });
+
+  it("rejects an invalid issue ID before requesting", async () => {
+    const fetch = createFetch(() =>
+      jsonResponse(createSessionResponse({ title: null }), 201),
+    );
+    const runtime = createRuntime({
+      env: { TOUGHCROWD_API_KEY: "tc_secret" },
+      fetch,
+    });
+
+    const exitCode = await runCli(
+      [
+        "session",
+        "new",
+        "Fix checkout",
+        "--repo",
+        "acme/web",
+        "--issue-id",
+        "not-a-uuid",
+      ],
+      runtime,
+    );
+
+    expect(exitCode).toBe(2);
+    expect(fetch.calls).toEqual([]);
+    expect(runtime.stderr.output).toBe(
+      "error: option '--issue-id <issue-id>' argument 'not-a-uuid' is invalid. must be a UUID\n",
+    );
   });
 
   it("prints generating for an omitted title", async () => {

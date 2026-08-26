@@ -195,6 +195,11 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
     .option("--profile <profile-id>", "Agent Profile to use")
     .option("--base-branch <branch>", "base branch for generated changes")
     .option("--title <title>", "session title")
+    .option(
+      "--issue-id <issue-id>",
+      "relate the new session to an issue",
+      parseIssueId,
+    )
     .option("--json", "print machine-readable JSON")
     .allowExcessArguments(false)
     .allowUnknownOption(false)
@@ -221,6 +226,7 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
             profile: options.profile,
             baseBranch: options.baseBranch,
             title: options.title,
+            issueId: options.issueId,
             json: options.json === true,
           },
         );
@@ -306,6 +312,13 @@ function parseListLimit(value: string): number {
 }
 
 function parseSessionId(value: string): string {
+  if (!isSessionId(value)) {
+    throw new InvalidArgumentError("must be a UUID");
+  }
+  return value;
+}
+
+function parseIssueId(value: string): string {
   if (!isSessionId(value)) {
     throw new InvalidArgumentError("must be a UUID");
   }

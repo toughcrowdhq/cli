@@ -111,6 +111,14 @@ try {
     ["session", "cancel", "--help"],
     { encoding: "utf8" },
   );
+  const deployHelpOutput = execFileSync(executable, ["deploy", "--help"], {
+    encoding: "utf8",
+  });
+  const deployRecordHelpOutput = execFileSync(
+    executable,
+    ["deploy", "record", "--help"],
+    { encoding: "utf8" },
+  );
   const installedPackageDirectory =
     process.platform === "win32"
       ? resolve(installationPrefix, "node_modules", "@toughcrowd", "cli")
@@ -166,6 +174,18 @@ try {
     ],
     { encoding: "utf8" },
   );
+  const deployRecordSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(
+        packageDirectory,
+        "scripts/fixtures/package-smoke-deploy-record.mjs",
+      ),
+      resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
 
   assert(
     versionOutput === `${metadata.version}\n`,
@@ -184,6 +204,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
+  deploy          Record Tough Crowd deployments
   help [command]  display help for command
 `;
   assert(
@@ -226,6 +247,21 @@ Commands:
     "installed CLI returned the wrong session help output",
   );
   assert(
+    deployHelpOutput.includes(
+      "Usage: toughcrowd deploy [options] [command]\n",
+    ) &&
+      deployHelpOutput.includes(
+        "  record [options]  Record a production deployment from GitHub Actions\n",
+      ) &&
+      deployRecordHelpOutput.includes(
+        "Usage: toughcrowd deploy record [options]\n",
+      ) &&
+      deployRecordHelpOutput.includes(
+        "  --json      print machine-readable JSON\n",
+      ),
+    "installed CLI returned the wrong deploy help output",
+  );
+  assert(
     authSmokeOutput === "Verified installed browser login\n",
     "installed CLI failed the browser-login smoke test",
   );
@@ -240,6 +276,10 @@ Commands:
   assert(
     sessionEndSmokeOutput === "Verified installed session end\n",
     "installed CLI failed the authenticated session-end smoke test",
+  );
+  assert(
+    deployRecordSmokeOutput === "Verified installed deploy record\n",
+    "installed CLI failed the authenticated deploy-record smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

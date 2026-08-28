@@ -63,6 +63,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
+  deploy          Record Tough Crowd deployments
   help [command]  display help for command
 ```
 
@@ -226,6 +227,23 @@ toughcrowd issue unlink-github <issue-id>
 
 Every bounded issue command accepts `--json`. API responses are validated and
 projected to documented client-facing fields before they are printed.
+
+## Deployments
+
+Record a production deployment after GitHub Actions health checks succeed:
+
+```sh
+toughcrowd deploy record
+```
+
+The command reads `GITHUB_REPOSITORY`, `GITHUB_SHA`, `GITHUB_RUN_ID`,
+`GITHUB_RUN_ATTEMPT`, and `GITHUB_SERVER_URL`, then calls the Tough Crowd API
+with a deterministic GitHub Actions source identity. Production is implicit for
+this MVP; there are no environment or application URL flags.
+
+Human output names the repository, deployed commit SHA, and number of sessions
+newly marked Deployed. Use `--json` to print the decoded API response for
+automation.
 
 ## Releases
 

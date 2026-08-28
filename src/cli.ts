@@ -22,6 +22,8 @@ import {
   type AuthorizationSecrets,
 } from "./auth/pkce.js";
 import { readGitOriginUrl } from "./git.js";
+import { createDeployCommandGroup } from "./deploy/cli.js";
+import { DeployCommandError } from "./deploy/errors.js";
 import { createIssueCommandGroup } from "./issue/cli.js";
 import { IssueCommandError } from "./issue/errors.js";
 import { create, type CreateSessionCommandOptions } from "./session/create.js";
@@ -101,6 +103,11 @@ export async function runCli(
       return error.exitCode;
     }
 
+    if (error instanceof DeployCommandError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     runtime.stderr.write(`${formatUnexpectedError(error)}\n`);
     return unexpectedFailureExitCode;
   } finally {
@@ -153,6 +160,13 @@ function createRootProgram(runtime: CliRuntime): Command {
             ? runtime.createIdempotencyKey()
             : randomUUID(),
       }),
+      runtime,
+    ),
+  );
+
+  program.addCommand(
+    configureCommandTree(
+      createDeployCommandGroup(createSessionRuntime(runtime)),
       runtime,
     ),
   );

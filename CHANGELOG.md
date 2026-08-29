@@ -1,5 +1,12 @@
 # @toughcrowd/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- a0cfc51: Add `--issue-id` to `session new` so coding-agent work can be associated with an issue as it is created.
+- 2adb937: Add `toughcrowd deploy report` to report successful production deployments from GitHub Actions and display their asynchronous reconciliation state.
+
 ## 0.5.0
 
 ### Minor Changes

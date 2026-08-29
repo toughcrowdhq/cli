@@ -1,24 +1,24 @@
 import { Command } from "commander";
 import {
-  recordDeploymentCommand,
-  type RecordDeploymentRuntime,
+  reportDeploymentCommand,
+  type ReportDeploymentRuntime,
 } from "./commands.js";
 
 export function createDeployCommandGroup(
-  runtime: RecordDeploymentRuntime,
+  runtime: ReportDeploymentRuntime,
 ): Command {
   return new Command("deploy")
-    .description("Record Tough Crowd deployments")
-    .addCommand(createRecordCommand(runtime));
+    .description("Report Tough Crowd deployments")
+    .addCommand(createReportCommand(runtime));
 }
 
-function createRecordCommand(runtime: RecordDeploymentRuntime): Command {
-  return new Command("record")
-    .description("Record a production deployment from GitHub Actions")
+function createReportCommand(runtime: ReportDeploymentRuntime): Command {
+  return new Command("report")
+    .description("Report a production deployment from GitHub Actions")
     .option("--json", "print machine-readable JSON")
     .allowExcessArguments(false)
     .allowUnknownOption(false)
     .action(async (options: { json?: boolean }) => {
-      await recordDeploymentCommand(runtime, { json: options.json === true });
+      await reportDeploymentCommand(runtime, { json: options.json === true });
     });
 }

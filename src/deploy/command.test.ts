@@ -8,53 +8,53 @@ const deployNamespaceHelp =
   [
     "Usage: toughcrowd deploy [options] [command]",
     "",
-    "Record Tough Crowd deployments",
+    "Report Tough Crowd deployments",
     "",
     "Options:",
     "  -h, --help        display help for command",
     "",
     "Commands:",
-    "  record [options]  Record a production deployment from GitHub Actions",
+    "  report [options]  Report a production deployment from GitHub Actions",
     "  help [command]    display help for command",
   ].join("\n") + "\n";
 
-const deployRecordHelp =
+const deployReportHelp =
   [
-    "Usage: toughcrowd deploy record [options]",
+    "Usage: toughcrowd deploy report [options]",
     "",
-    "Record a production deployment from GitHub Actions",
+    "Report a production deployment from GitHub Actions",
     "",
     "Options:",
     "  --json      print machine-readable JSON",
     "  -h, --help  display help for command",
   ].join("\n") + "\n";
 
-describe("deploy record command", () => {
+describe("deploy report command", () => {
   it("prints literal namespace and command help", async () => {
     const namespace = createRuntime();
-    const record = createRuntime();
+    const report = createRuntime();
 
     const namespaceExitCode = await runCli(["deploy", "--help"], namespace);
-    const recordExitCode = await runCli(["deploy", "record", "--help"], record);
+    const reportExitCode = await runCli(["deploy", "report", "--help"], report);
 
     expect(namespaceExitCode).toBe(0);
     expect(namespace.stdout.output).toBe(deployNamespaceHelp);
     expect(namespace.stderr.output).toBe("");
-    expect(recordExitCode).toBe(0);
-    expect(record.stdout.output).toBe(deployRecordHelp);
-    expect(record.stderr.output).toBe("");
+    expect(reportExitCode).toBe(0);
+    expect(report.stdout.output).toBe(deployReportHelp);
+    expect(report.stderr.output).toBe("");
   });
 
-  it("records a production deployment from GitHub Actions context", async () => {
+  it("reports a production deployment from GitHub Actions context", async () => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ associatedSessions: 2 })),
+      jsonResponse(createDeploymentResponse({ reconciliationState: "queued" })),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({ TOUGHCROWD_API_KEY: "tc_deploy_secret" }),
       fetch,
     });
 
-    const exitCode = await runCli(["deploy", "record"], runtime);
+    const exitCode = await runCli(["deploy", "report"], runtime);
 
     expect(exitCode).toBe(0);
     expect(fetch.calls).toHaveLength(1);
@@ -75,10 +75,10 @@ describe("deploy record command", () => {
       }),
     });
     expect(runtime.stdout.output).toBe(
-      "Deployment recorded\n" +
+      "Deployment reported\n" +
         "Repository: acme/web\n" +
         `SHA: ${commitSha}\n` +
-        "Sessions newly marked Deployed: 2\n",
+        "Reconciliation: queued\n",
     );
     expect(runtime.stderr.output).toBe("");
   });
@@ -88,17 +88,17 @@ describe("deploy record command", () => {
       env: githubActionsEnv({ TOUGHCROWD_API_KEY: "tc_deploy_secret" }),
       fetch: createFetch(() =>
         jsonResponse({
-          ...createDeploymentResponse({ associatedSessions: 0 }),
+          ...createDeploymentResponse({ reconciliationState: "completed" }),
           serverOnly: "discarded",
         }),
       ),
     });
 
-    const exitCode = await runCli(["deploy", "record", "--json"], runtime);
+    const exitCode = await runCli(["deploy", "report", "--json"], runtime);
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(
-      `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"987654321","githubActionsRunAttempt":3,"workflowRunUrl":"https://github.com/acme/web/actions/runs/987654321","deployedAt":"2026-08-29T12:34:56.000Z"},"associatedSessions":{"count":0}}\n`,
+      `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"987654321","githubActionsRunAttempt":3,"workflowRunUrl":"https://github.com/acme/web/actions/runs/987654321","deployedAt":"2026-08-29T12:34:56.000Z"},"reconciliation":{"state":"completed"}}\n`,
     );
     expect(runtime.stdout.output).not.toContain("serverOnly");
     expect(runtime.stderr.output).toBe("");
@@ -106,7 +106,9 @@ describe("deploy record command", () => {
 
   it("normalizes repository and SHA while preserving run identity", async () => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ associatedSessions: 1 })),
+      jsonResponse(
+        createDeploymentResponse({ reconciliationState: "running" }),
+      ),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({
@@ -118,7 +120,7 @@ describe("deploy record command", () => {
       fetch,
     });
 
-    const exitCode = await runCli(["deploy", "record"], runtime);
+    const exitCode = await runCli(["deploy", "report"], runtime);
 
     expect(exitCode).toBe(0);
     expect(fetch.calls[0].idempotencyKey).toBe(
@@ -145,13 +147,13 @@ describe("deploy record command", () => {
       },
     });
 
-    const exitCode = await runCli(["deploy", "record"], runtime);
+    const exitCode = await runCli(["deploy", "report"], runtime);
 
     expect(exitCode).toBe(1);
     expect(credentialReads).toBe(0);
     expect(runtime.stdout.output).toBe("");
     expect(runtime.stderr.output).toBe(
-      "Could not record deployment: GITHUB_REPOSITORY is required. Run `toughcrowd deploy record` from a GitHub Actions workflow after deployment health checks succeed.\n",
+      "Could not report deployment: GITHUB_REPOSITORY is required. Run `toughcrowd deploy report` from a GitHub Actions workflow after deployment health checks succeed.\n",
     );
   });
 
@@ -159,26 +161,26 @@ describe("deploy record command", () => {
     [
       "short SHA",
       { GITHUB_SHA: "abc123" },
-      "Could not record deployment: GITHUB_SHA must be the full 40-character commit SHA.\n",
+      "Could not report deployment: GITHUB_SHA must be the full 40-character commit SHA.\n",
     ],
     [
       "missing run ID",
       { GITHUB_RUN_ID: "" },
-      "Could not record deployment: GITHUB_RUN_ID is required. Run `toughcrowd deploy record` from a GitHub Actions workflow after deployment health checks succeed.\n",
+      "Could not report deployment: GITHUB_RUN_ID is required. Run `toughcrowd deploy report` from a GitHub Actions workflow after deployment health checks succeed.\n",
     ],
     [
       "bad run attempt",
       { GITHUB_RUN_ATTEMPT: "0" },
-      "Could not record deployment: GITHUB_RUN_ATTEMPT must be a positive GitHub Actions run attempt.\n",
+      "Could not report deployment: GITHUB_RUN_ATTEMPT must be a positive GitHub Actions run attempt.\n",
     ],
     [
       "non-HTTPS server URL",
       { GITHUB_SERVER_URL: "http://github.example.com" },
-      "Could not record deployment: GITHUB_SERVER_URL must be an HTTPS URL.\n",
+      "Could not report deployment: GITHUB_SERVER_URL must be an HTTPS URL.\n",
     ],
   ])("rejects %s", async (_label, envOverride, expectedError) => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ associatedSessions: 1 })),
+      jsonResponse(createDeploymentResponse({ reconciliationState: "queued" })),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({
@@ -188,7 +190,7 @@ describe("deploy record command", () => {
       fetch,
     });
 
-    const exitCode = await runCli(["deploy", "record"], runtime);
+    const exitCode = await runCli(["deploy", "report"], runtime);
 
     expect(exitCode).toBe(1);
     expect(fetch.calls).toEqual([]);
@@ -214,12 +216,12 @@ describe("deploy record command", () => {
       ),
     });
 
-    const exitCode = await runCli(["deploy", "record"], runtime);
+    const exitCode = await runCli(["deploy", "report"], runtime);
 
     expect(exitCode).toBe(1);
     expect(runtime.stdout.output).toBe("");
     expect(runtime.stderr.output).toBe(
-      "Could not record deployment: Deployment source identity was already used.\n",
+      "Could not report deployment: Deployment source identity was already used.\n",
     );
     expect(runtime.stderr.output).not.toContain("tc_deploy_secret");
     expect(runtime.stderr.output).not.toContain("Bearer");
@@ -241,11 +243,11 @@ describe("deploy record command", () => {
       ),
     });
 
-    const exitCode = await runCli(["deploy", "record"], runtime);
+    const exitCode = await runCli(["deploy", "report"], runtime);
 
     expect(exitCode).toBe(1);
     expect(runtime.stderr.output).toBe(
-      "Could not record deployment: the Tough Crowd API returned an internal error.\n",
+      "Could not report deployment: the Tough Crowd API returned an internal error.\n",
     );
     expect(runtime.stderr.output).not.toContain("production-primary");
   });
@@ -264,7 +266,9 @@ function githubActionsEnv(
   };
 }
 
-function createDeploymentResponse(options: { associatedSessions: number }) {
+function createDeploymentResponse(options: {
+  reconciliationState: "queued" | "running" | "completed" | "failed";
+}) {
   return {
     deployment: {
       id: "44444444-4444-4444-8444-444444444444",
@@ -280,7 +284,7 @@ function createDeploymentResponse(options: { associatedSessions: number }) {
       workflowRunUrl: "https://github.com/acme/web/actions/runs/987654321",
       deployedAt: "2026-08-29T12:34:56.000Z",
     },
-    associatedSessions: { count: options.associatedSessions },
+    reconciliation: { state: options.reconciliationState },
   };
 }
 

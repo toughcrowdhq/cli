@@ -13,7 +13,7 @@ const stdout = createOutput();
 const stderr = createOutput();
 const fetchCalls = [];
 
-const exitCode = await runCli(["deploy", "record", "--json"], {
+const exitCode = await runCli(["deploy", "report", "--json"], {
   stdout,
   stderr,
   version: cliVersion,
@@ -32,7 +32,7 @@ const exitCode = await runCli(["deploy", "record", "--json"], {
       throw new Error("environment authentication must not read keyring");
     },
     async write() {
-      throw new Error("deploy record must not write keyring");
+      throw new Error("deploy report must not write keyring");
     },
   },
   async fetch(url, init) {
@@ -61,15 +61,15 @@ const exitCode = await runCli(["deploy", "record", "--json"], {
         workflowRunUrl: "https://github.com/acme/web/actions/runs/123456789",
         deployedAt: "2026-08-29T12:34:56.000Z",
       },
-      associatedSessions: { count: 3 },
+      reconciliation: { state: "queued" },
       serverOnly: "discarded",
     });
   },
 });
 
-assert(exitCode === 0, "installed deploy record returned the wrong exit code");
-assert(stderr.value === "", "installed deploy record wrote diagnostics");
-assert(fetchCalls.length === 1, "installed deploy record made extra requests");
+assert(exitCode === 0, "installed deploy report returned the wrong exit code");
+assert(stderr.value === "", "installed deploy report wrote diagnostics");
+assert(fetchCalls.length === 1, "installed deploy report made extra requests");
 assert(
   JSON.stringify(fetchCalls[0]) ===
     JSON.stringify({
@@ -87,21 +87,21 @@ assert(
         workflowRunUrl: "https://github.com/acme/web/actions/runs/123456789",
       }),
     }),
-  "installed deploy record sent the wrong request",
+  "installed deploy report sent the wrong request",
 );
 assert(
   stdout.value ===
-    `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"123456789","githubActionsRunAttempt":2,"workflowRunUrl":"https://github.com/acme/web/actions/runs/123456789","deployedAt":"2026-08-29T12:34:56.000Z"},"associatedSessions":{"count":3}}\n`,
-  "installed deploy record returned the wrong JSON document",
+    `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"123456789","githubActionsRunAttempt":2,"workflowRunUrl":"https://github.com/acme/web/actions/runs/123456789","deployedAt":"2026-08-29T12:34:56.000Z"},"reconciliation":{"state":"queued"}}\n`,
+  "installed deploy report returned the wrong JSON document",
 );
 assert(
   !stdout.value.includes("serverOnly") &&
     !stdout.value.includes(apiKey) &&
     !stderr.value.includes(apiKey),
-  "installed deploy record exposed discarded or secret values",
+  "installed deploy report exposed discarded or secret values",
 );
 
-process.stdout.write("Verified installed deploy record\n");
+process.stdout.write("Verified installed deploy report\n");
 
 function createOutput() {
   return {

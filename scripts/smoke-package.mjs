@@ -114,9 +114,9 @@ try {
   const deployHelpOutput = execFileSync(executable, ["deploy", "--help"], {
     encoding: "utf8",
   });
-  const deployRecordHelpOutput = execFileSync(
+  const deployReportHelpOutput = execFileSync(
     executable,
-    ["deploy", "record", "--help"],
+    ["deploy", "report", "--help"],
     { encoding: "utf8" },
   );
   const installedPackageDirectory =
@@ -174,12 +174,12 @@ try {
     ],
     { encoding: "utf8" },
   );
-  const deployRecordSmokeOutput = execFileSync(
+  const deployReportSmokeOutput = execFileSync(
     process.execPath,
     [
       resolve(
         packageDirectory,
-        "scripts/fixtures/package-smoke-deploy-record.mjs",
+        "scripts/fixtures/package-smoke-deploy-report.mjs",
       ),
       resolve(installedPackageDirectory, "dist/cli.js"),
       metadata.version,
@@ -204,7 +204,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
-  deploy          Record Tough Crowd deployments
+  deploy          Report Tough Crowd deployments
   help [command]  display help for command
 `;
   assert(
@@ -251,12 +251,12 @@ Commands:
       "Usage: toughcrowd deploy [options] [command]\n",
     ) &&
       deployHelpOutput.includes(
-        "  record [options]  Record a production deployment from GitHub Actions\n",
+        "  report [options]  Report a production deployment from GitHub Actions\n",
       ) &&
-      deployRecordHelpOutput.includes(
-        "Usage: toughcrowd deploy record [options]\n",
+      deployReportHelpOutput.includes(
+        "Usage: toughcrowd deploy report [options]\n",
       ) &&
-      deployRecordHelpOutput.includes(
+      deployReportHelpOutput.includes(
         "  --json      print machine-readable JSON\n",
       ),
     "installed CLI returned the wrong deploy help output",
@@ -278,8 +278,8 @@ Commands:
     "installed CLI failed the authenticated session-end smoke test",
   );
   assert(
-    deployRecordSmokeOutput === "Verified installed deploy record\n",
-    "installed CLI failed the authenticated deploy-record smoke test",
+    deployReportSmokeOutput === "Verified installed deploy report\n",
+    "installed CLI failed the authenticated deploy-report smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

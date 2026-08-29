@@ -1,10 +1,10 @@
 import { requestJson, type RequestJsonOptions } from "../api/request.js";
 import {
-  decodeDeploymentRecordResponse,
-  type DeploymentRecordResponse,
+  decodeDeploymentReportResponse,
+  type DeploymentReportResponse,
 } from "./types.js";
 
-export interface RecordDeploymentOptions {
+export interface ReportDeploymentOptions {
   apiOrigin: string;
   authorization: string;
   repository: string;
@@ -18,13 +18,13 @@ export interface RecordDeploymentOptions {
   idempotencyKey: string;
   signal: AbortSignal;
   version: string;
-  fetch?: RequestJsonOptions<DeploymentRecordResponse>["fetch"];
-  timers?: RequestJsonOptions<DeploymentRecordResponse>["timers"];
+  fetch?: RequestJsonOptions<DeploymentReportResponse>["fetch"];
+  timers?: RequestJsonOptions<DeploymentReportResponse>["timers"];
 }
 
-export function recordDeployment(
-  options: RecordDeploymentOptions,
-): Promise<DeploymentRecordResponse> {
+export function reportDeployment(
+  options: ReportDeploymentOptions,
+): Promise<DeploymentReportResponse> {
   return requestJson({
     origin: options.apiOrigin,
     method: "POST",
@@ -42,6 +42,6 @@ export function recordDeployment(
     fetch: options.fetch,
     timers: options.timers,
     metadata: { cliVersion: options.version },
-    decode: decodeDeploymentRecordResponse,
+    decode: decodeDeploymentReportResponse,
   });
 }

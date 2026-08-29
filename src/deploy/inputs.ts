@@ -8,7 +8,7 @@ export interface GitHubActionsDeploymentEnvironment {
   GITHUB_SERVER_URL?: string;
 }
 
-export interface DeploymentRecordInputs {
+export interface DeploymentReportInputs {
   repository: string;
   commitSha: string;
   source: {
@@ -25,9 +25,9 @@ const repositoryPattern =
 const shaPattern = /^[0-9a-f]{40}$/iu;
 const positiveIntegerPattern = /^[1-9][0-9]*$/u;
 
-export function resolveDeploymentRecordInputs(
+export function resolveDeploymentReportInputs(
   env: GitHubActionsDeploymentEnvironment | undefined,
-): DeploymentRecordInputs {
+): DeploymentReportInputs {
   const repository = readRequired(env?.GITHUB_REPOSITORY, "GITHUB_REPOSITORY");
   const commitSha = readRequired(env?.GITHUB_SHA, "GITHUB_SHA");
   const runId = readRequired(env?.GITHUB_RUN_ID, "GITHUB_RUN_ID");
@@ -92,7 +92,7 @@ function readRequired(value: string | undefined, name: string): string {
   const text = value?.trim();
   if (text == null || text.length === 0) {
     throw invalidContext(
-      `${name} is required. Run \`toughcrowd deploy record\` from a GitHub Actions workflow after deployment health checks succeed.`,
+      `${name} is required. Run \`toughcrowd deploy report\` from a GitHub Actions workflow after deployment health checks succeed.`,
     );
   }
   return text;
@@ -131,7 +131,7 @@ function withTrailingSlash(url: URL): URL {
 }
 
 function invalidContext(message: string): DeployCommandError {
-  return new DeployCommandError(`Could not record deployment: ${message}`);
+  return new DeployCommandError(`Could not report deployment: ${message}`);
 }
 
 function containsControlCharacter(value: string): boolean {

@@ -63,7 +63,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
-  deploy          Record Tough Crowd deployments
+  deploy          Report Tough Crowd deployments
   help [command]  display help for command
 ```
 
@@ -230,10 +230,10 @@ projected to documented client-facing fields before they are printed.
 
 ## Deployments
 
-Record a production deployment after GitHub Actions health checks succeed:
+Report a successful production deployment after GitHub Actions health checks succeed:
 
 ```sh
-toughcrowd deploy record
+toughcrowd deploy report
 ```
 
 The command reads `GITHUB_REPOSITORY`, `GITHUB_SHA`, `GITHUB_RUN_ID`,

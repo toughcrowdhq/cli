@@ -1,37 +1,37 @@
 import { ApiClientError } from "../api/errors.js";
 import { apiKeyEnvironmentVariable } from "../auth/credentials.js";
 import { AuthCommandError } from "../auth/errors.js";
-import { recordDeployment } from "./api.js";
+import { reportDeployment } from "./api.js";
 import { DeployCommandError } from "./errors.js";
 import {
-  resolveDeploymentRecordInputs,
+  resolveDeploymentReportInputs,
   type GitHubActionsDeploymentEnvironment,
 } from "./inputs.js";
 import {
-  printHumanDeploymentRecord,
-  printJsonDeploymentRecord,
+  printHumanDeploymentReport,
+  printJsonDeploymentReport,
 } from "./output.js";
 import {
   resolveAuthenticatedDeployApiRuntime,
   type DeployRuntime,
 } from "./runtime.js";
 
-export interface RecordDeploymentRuntime extends DeployRuntime {
+export interface ReportDeploymentRuntime extends DeployRuntime {
   env?: DeployRuntime["env"] & GitHubActionsDeploymentEnvironment;
 }
 
-export interface RecordDeploymentCommandOptions {
+export interface ReportDeploymentCommandOptions {
   json?: boolean;
 }
 
-export async function recordDeploymentCommand(
-  runtime: RecordDeploymentRuntime,
-  options: RecordDeploymentCommandOptions,
+export async function reportDeploymentCommand(
+  runtime: ReportDeploymentRuntime,
+  options: ReportDeploymentCommandOptions,
 ): Promise<void> {
   try {
-    const inputs = resolveDeploymentRecordInputs(runtime.env);
+    const inputs = resolveDeploymentReportInputs(runtime.env);
     const apiRuntime = await resolveAuthenticatedDeployApiRuntime(runtime);
-    const result = await recordDeployment({
+    const result = await reportDeployment({
       ...apiRuntime,
       repository: inputs.repository,
       commitSha: inputs.commitSha,
@@ -40,9 +40,9 @@ export async function recordDeploymentCommand(
     });
 
     if (options.json === true) {
-      printJsonDeploymentRecord(runtime.stdout, result);
+      printJsonDeploymentReport(runtime.stdout, result);
     } else {
-      printHumanDeploymentRecord(runtime.stdout, result);
+      printHumanDeploymentReport(runtime.stdout, result);
     }
   } catch (error) {
     throw formatDeploymentFailure(error);
@@ -58,16 +58,16 @@ function formatDeploymentFailure(error: unknown): Error {
   }
   if (error instanceof ApiClientError) {
     if (error.kind === "canceled") {
-      return new DeployCommandError("Deployment recording canceled.", 130);
+      return new DeployCommandError("Deployment reporting canceled.", 130);
     }
     if (error.kind === "timeout") {
       return new DeployCommandError(
-        "Could not record deployment: the API request timed out.",
+        "Could not report deployment: the API request timed out.",
       );
     }
     if (error.kind === "network") {
       return new DeployCommandError(
-        "Could not record deployment: could not reach the Tough Crowd API.",
+        "Could not report deployment: could not reach the Tough Crowd API.",
       );
     }
     if (
@@ -80,16 +80,16 @@ function formatDeploymentFailure(error: unknown): Error {
     }
     if (error.status != null && error.status >= 500) {
       return new DeployCommandError(
-        "Could not record deployment: the Tough Crowd API returned an internal error.",
+        "Could not report deployment: the Tough Crowd API returned an internal error.",
       );
     }
     if (error.kind === "api") {
       return new DeployCommandError(
-        `Could not record deployment: ${error.message}`,
+        `Could not report deployment: ${error.message}`,
       );
     }
   }
   return new DeployCommandError(
-    "Could not record deployment: the Tough Crowd API returned an invalid response.",
+    "Could not report deployment: the Tough Crowd API returned an invalid response.",
   );
 }

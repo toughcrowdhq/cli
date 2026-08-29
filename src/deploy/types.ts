@@ -1,4 +1,4 @@
-export interface DeploymentRecordResponse {
+export interface DeploymentReportResponse {
   deployment: {
     id: string;
     repository: {
@@ -24,9 +24,9 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const shaPattern = /^[0-9a-f]{40}$/iu;
 
-export function decodeDeploymentRecordResponse(
+export function decodeDeploymentReportResponse(
   value: unknown,
-): DeploymentRecordResponse {
+): DeploymentReportResponse {
   if (!isRecord(value) || !isRecord(value.deployment)) {
     throw new TypeError("deployment response is invalid");
   }

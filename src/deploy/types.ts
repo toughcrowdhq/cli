@@ -12,10 +12,13 @@ export interface DeploymentRecordResponse {
     workflowRunUrl: string;
     deployedAt: string;
   };
-  associatedSessions: {
-    count: number;
+  reconciliation: {
+    state: DeploymentReconciliationState;
   };
 }
+
+export type DeploymentReconciliationState =
+  "queued" | "running" | "completed" | "failed";
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -50,8 +53,8 @@ export function decodeDeploymentRecordResponse(
   );
   const workflowRunUrl = readUrl(deployment.workflowRunUrl);
   const deployedAt = readDateTime(deployment.deployedAt);
-  const associatedSessions = isRecord(value.associatedSessions)
-    ? readNonnegativeInteger(value.associatedSessions.count)
+  const reconciliationState = isRecord(value.reconciliation)
+    ? readDeploymentReconciliationState(value.reconciliation.state)
     : null;
 
   if (
@@ -64,7 +67,7 @@ export function decodeDeploymentRecordResponse(
     githubActionsRunAttempt == null ||
     workflowRunUrl == null ||
     deployedAt == null ||
-    associatedSessions == null
+    reconciliationState == null
   ) {
     throw new TypeError("deployment response is invalid");
   }
@@ -83,7 +86,7 @@ export function decodeDeploymentRecordResponse(
       workflowRunUrl,
       deployedAt,
     },
-    associatedSessions: { count: associatedSessions },
+    reconciliation: { state: reconciliationState },
   };
 }
 
@@ -112,8 +115,13 @@ function readBoundedString(
   return value;
 }
 
-function readNonnegativeInteger(value: unknown): number | null {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+function readDeploymentReconciliationState(
+  value: unknown,
+): DeploymentReconciliationState | null {
+  return value === "queued" ||
+    value === "running" ||
+    value === "completed" ||
+    value === "failed"
     ? value
     : null;
 }

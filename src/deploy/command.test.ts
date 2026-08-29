@@ -47,7 +47,7 @@ describe("deploy record command", () => {
 
   it("records a production deployment from GitHub Actions context", async () => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ associatedSessions: 2 })),
+      jsonResponse(createDeploymentResponse({ reconciliationState: "queued" })),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({ TOUGHCROWD_API_KEY: "tc_deploy_secret" }),
@@ -78,7 +78,7 @@ describe("deploy record command", () => {
       "Deployment recorded\n" +
         "Repository: acme/web\n" +
         `SHA: ${commitSha}\n` +
-        "Sessions newly marked Deployed: 2\n",
+        "Reconciliation: queued\n",
     );
     expect(runtime.stderr.output).toBe("");
   });
@@ -88,7 +88,7 @@ describe("deploy record command", () => {
       env: githubActionsEnv({ TOUGHCROWD_API_KEY: "tc_deploy_secret" }),
       fetch: createFetch(() =>
         jsonResponse({
-          ...createDeploymentResponse({ associatedSessions: 0 }),
+          ...createDeploymentResponse({ reconciliationState: "completed" }),
           serverOnly: "discarded",
         }),
       ),
@@ -98,7 +98,7 @@ describe("deploy record command", () => {
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(
-      `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"987654321","githubActionsRunAttempt":3,"workflowRunUrl":"https://github.com/acme/web/actions/runs/987654321","deployedAt":"2026-08-29T12:34:56.000Z"},"associatedSessions":{"count":0}}\n`,
+      `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"987654321","githubActionsRunAttempt":3,"workflowRunUrl":"https://github.com/acme/web/actions/runs/987654321","deployedAt":"2026-08-29T12:34:56.000Z"},"reconciliation":{"state":"completed"}}\n`,
     );
     expect(runtime.stdout.output).not.toContain("serverOnly");
     expect(runtime.stderr.output).toBe("");
@@ -106,7 +106,9 @@ describe("deploy record command", () => {
 
   it("normalizes repository and SHA while preserving run identity", async () => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ associatedSessions: 1 })),
+      jsonResponse(
+        createDeploymentResponse({ reconciliationState: "running" }),
+      ),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({
@@ -178,7 +180,7 @@ describe("deploy record command", () => {
     ],
   ])("rejects %s", async (_label, envOverride, expectedError) => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ associatedSessions: 1 })),
+      jsonResponse(createDeploymentResponse({ reconciliationState: "queued" })),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({
@@ -264,7 +266,9 @@ function githubActionsEnv(
   };
 }
 
-function createDeploymentResponse(options: { associatedSessions: number }) {
+function createDeploymentResponse(options: {
+  reconciliationState: "queued" | "running" | "completed" | "failed";
+}) {
   return {
     deployment: {
       id: "44444444-4444-4444-8444-444444444444",
@@ -280,7 +284,7 @@ function createDeploymentResponse(options: { associatedSessions: number }) {
       workflowRunUrl: "https://github.com/acme/web/actions/runs/987654321",
       deployedAt: "2026-08-29T12:34:56.000Z",
     },
-    associatedSessions: { count: options.associatedSessions },
+    reconciliation: { state: options.reconciliationState },
   };
 }
 

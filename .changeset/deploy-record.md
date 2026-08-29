@@ -2,4 +2,4 @@
 "@toughcrowd/cli": minor
 ---
 
-Add `toughcrowd deploy record` for recording production deployments from GitHub Actions using the supported deployment API contract.
+Add `toughcrowd deploy record` for recording production deployments from GitHub Actions and reporting their asynchronous reconciliation state.

@@ -241,8 +241,8 @@ The command reads `GITHUB_REPOSITORY`, `GITHUB_SHA`, `GITHUB_RUN_ID`,
 with a deterministic GitHub Actions source identity. Production is implicit for
 this MVP; there are no environment or application URL flags.
 
-Human output names the repository, deployed commit SHA, and number of sessions
-newly marked Deployed. Use `--json` to print the decoded API response for
+Human output names the repository, deployed commit SHA, and asynchronous
+reconciliation state. Use `--json` to print the decoded API response for
 automation.
 
 ## Releases

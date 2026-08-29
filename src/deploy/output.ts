@@ -7,9 +7,7 @@ export function printHumanDeploymentRecord(
   stdout.write("Deployment recorded\n");
   stdout.write(`Repository: ${result.deployment.repository.fullName}\n`);
   stdout.write(`SHA: ${result.deployment.commitSha}\n`);
-  stdout.write(
-    `Sessions newly marked Deployed: ${result.associatedSessions.count}\n`,
-  );
+  stdout.write(`Reconciliation: ${result.reconciliation.state}\n`);
 }
 
 export function printJsonDeploymentRecord(

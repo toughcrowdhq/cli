@@ -61,7 +61,7 @@ const exitCode = await runCli(["deploy", "record", "--json"], {
         workflowRunUrl: "https://github.com/acme/web/actions/runs/123456789",
         deployedAt: "2026-08-29T12:34:56.000Z",
       },
-      associatedSessions: { count: 3 },
+      reconciliation: { state: "queued" },
       serverOnly: "discarded",
     });
   },
@@ -91,7 +91,7 @@ assert(
 );
 assert(
   stdout.value ===
-    `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"123456789","githubActionsRunAttempt":2,"workflowRunUrl":"https://github.com/acme/web/actions/runs/123456789","deployedAt":"2026-08-29T12:34:56.000Z"},"associatedSessions":{"count":3}}\n`,
+    `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"123456789","githubActionsRunAttempt":2,"workflowRunUrl":"https://github.com/acme/web/actions/runs/123456789","deployedAt":"2026-08-29T12:34:56.000Z"},"reconciliation":{"state":"queued"}}\n`,
   "installed deploy record returned the wrong JSON document",
 );
 assert(

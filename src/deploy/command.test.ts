@@ -47,7 +47,7 @@ describe("deploy record command", () => {
 
   it("records a production deployment from GitHub Actions context", async () => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ newlyDeployedSessions: 2 }), 201),
+      jsonResponse(createDeploymentResponse({ associatedSessions: 2 })),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({ TOUGHCROWD_API_KEY: "tc_deploy_secret" }),
@@ -67,15 +67,11 @@ describe("deploy record command", () => {
       contentType: "application/json",
       client: "@toughcrowd/cli/0.2.0-test",
       body: JSON.stringify({
-        repository: "acme/web",
+        repository: { fullName: "acme/web" },
         commitSha,
-        environment: "production",
-        source: {
-          provider: "github_actions",
-          runId: "987654321",
-          runAttempt: "3",
-          workflowRunUrl: "https://github.com/acme/web/actions/runs/987654321",
-        },
+        githubActionsRunId: "987654321",
+        githubActionsRunAttempt: 3,
+        workflowRunUrl: "https://github.com/acme/web/actions/runs/987654321",
       }),
     });
     expect(runtime.stdout.output).toBe(
@@ -92,7 +88,7 @@ describe("deploy record command", () => {
       env: githubActionsEnv({ TOUGHCROWD_API_KEY: "tc_deploy_secret" }),
       fetch: createFetch(() =>
         jsonResponse({
-          ...createDeploymentResponse({ newlyDeployedSessions: 0 }),
+          ...createDeploymentResponse({ associatedSessions: 0 }),
           serverOnly: "discarded",
         }),
       ),
@@ -102,7 +98,7 @@ describe("deploy record command", () => {
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(
-      `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"fullName":"acme/web"},"commitSha":"${commitSha}","environment":"production","newlyDeployedSessions":0}}\n`,
+      `{"deployment":{"id":"44444444-4444-4444-8444-444444444444","repository":{"id":"55555555-5555-4555-8555-555555555555","githubRepositoryId":"123456789","fullName":"acme/web"},"commitSha":"${commitSha}","githubActionsRunId":"987654321","githubActionsRunAttempt":3,"workflowRunUrl":"https://github.com/acme/web/actions/runs/987654321","deployedAt":"2026-08-29T12:34:56.000Z"},"associatedSessions":{"count":0}}\n`,
     );
     expect(runtime.stdout.output).not.toContain("serverOnly");
     expect(runtime.stderr.output).toBe("");
@@ -110,7 +106,7 @@ describe("deploy record command", () => {
 
   it("normalizes repository and SHA while preserving run identity", async () => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ newlyDeployedSessions: 1 }), 201),
+      jsonResponse(createDeploymentResponse({ associatedSessions: 1 })),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({
@@ -131,6 +127,7 @@ describe("deploy record command", () => {
     expect(fetch.calls[0].body).toContain(
       '"workflowRunUrl":"https://github.example.com/acme/web/actions/runs/987654321"',
     );
+    expect(fetch.calls[0].body).toContain('"githubActionsRunAttempt":3');
   });
 
   it("fails with concise context errors before authentication", async () => {
@@ -181,7 +178,7 @@ describe("deploy record command", () => {
     ],
   ])("rejects %s", async (_label, envOverride, expectedError) => {
     const fetch = createFetch(() =>
-      jsonResponse(createDeploymentResponse({ newlyDeployedSessions: 1 })),
+      jsonResponse(createDeploymentResponse({ associatedSessions: 1 })),
     );
     const runtime = createRuntime({
       env: githubActionsEnv({
@@ -267,18 +264,23 @@ function githubActionsEnv(
   };
 }
 
-function createDeploymentResponse(options: { newlyDeployedSessions: number }) {
+function createDeploymentResponse(options: { associatedSessions: number }) {
   return {
     deployment: {
       id: "44444444-4444-4444-8444-444444444444",
       repository: {
+        id: "55555555-5555-4555-8555-555555555555",
+        githubRepositoryId: "123456789",
         fullName: "acme/web",
         serverOnly: "discarded",
       },
       commitSha,
-      environment: "production",
-      newlyDeployedSessions: options.newlyDeployedSessions,
+      githubActionsRunId: "987654321",
+      githubActionsRunAttempt: 3,
+      workflowRunUrl: "https://github.com/acme/web/actions/runs/987654321",
+      deployedAt: "2026-08-29T12:34:56.000Z",
     },
+    associatedSessions: { count: options.associatedSessions },
   };
 }
 

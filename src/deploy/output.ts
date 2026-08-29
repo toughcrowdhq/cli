@@ -8,7 +8,7 @@ export function printHumanDeploymentRecord(
   stdout.write(`Repository: ${result.deployment.repository.fullName}\n`);
   stdout.write(`SHA: ${result.deployment.commitSha}\n`);
   stdout.write(
-    `Sessions newly marked Deployed: ${result.deployment.newlyDeployedSessions}\n`,
+    `Sessions newly marked Deployed: ${result.associatedSessions.count}\n`,
   );
 }
 

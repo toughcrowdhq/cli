@@ -2,11 +2,18 @@ export interface DeploymentRecordResponse {
   deployment: {
     id: string;
     repository: {
+      id: string;
+      githubRepositoryId: string;
       fullName: string;
     };
     commitSha: string;
-    environment: "production";
-    newlyDeployedSessions: number;
+    githubActionsRunId: string;
+    githubActionsRunAttempt: number;
+    workflowRunUrl: string;
+    deployedAt: string;
+  };
+  associatedSessions: {
+    count: number;
   };
 }
 
@@ -27,18 +34,37 @@ export function decodeDeploymentRecordResponse(
   }
 
   const id = readUuid(deployment.id);
+  const repositoryId = readUuid(deployment.repository.id);
+  const githubRepositoryId = readBoundedString(
+    deployment.repository.githubRepositoryId,
+    255,
+  );
   const fullName = readBoundedString(deployment.repository.fullName, 255);
   const commitSha = readCommitSha(deployment.commitSha);
-  const newlyDeployedSessions = readNonnegativeInteger(
-    deployment.newlyDeployedSessions,
+  const githubActionsRunId = readBoundedString(
+    deployment.githubActionsRunId,
+    255,
   );
+  const githubActionsRunAttempt = readPositiveInteger(
+    deployment.githubActionsRunAttempt,
+  );
+  const workflowRunUrl = readUrl(deployment.workflowRunUrl);
+  const deployedAt = readDateTime(deployment.deployedAt);
+  const associatedSessions = isRecord(value.associatedSessions)
+    ? readNonnegativeInteger(value.associatedSessions.count)
+    : null;
 
   if (
     id == null ||
+    repositoryId == null ||
+    githubRepositoryId == null ||
     fullName == null ||
     commitSha == null ||
-    deployment.environment !== "production" ||
-    newlyDeployedSessions == null
+    githubActionsRunId == null ||
+    githubActionsRunAttempt == null ||
+    workflowRunUrl == null ||
+    deployedAt == null ||
+    associatedSessions == null
   ) {
     throw new TypeError("deployment response is invalid");
   }
@@ -46,11 +72,18 @@ export function decodeDeploymentRecordResponse(
   return {
     deployment: {
       id,
-      repository: { fullName },
+      repository: {
+        id: repositoryId,
+        githubRepositoryId,
+        fullName,
+      },
       commitSha,
-      environment: "production",
-      newlyDeployedSessions,
+      githubActionsRunId,
+      githubActionsRunAttempt,
+      workflowRunUrl,
+      deployedAt,
     },
+    associatedSessions: { count: associatedSessions },
   };
 }
 
@@ -83,6 +116,27 @@ function readNonnegativeInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
     ? value
     : null;
+}
+
+function readPositiveInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+function readUrl(value: unknown): string | null {
+  const text = readBoundedString(value, 2_048);
+  if (text == null) return null;
+  try {
+    return new URL(text).toString() === text ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+function readDateTime(value: unknown): string | null {
+  const text = readBoundedString(value, 64);
+  return text != null && !Number.isNaN(Date.parse(text)) ? text : null;
 }
 
 function containsControlCharacter(value: string): boolean {

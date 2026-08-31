@@ -197,6 +197,8 @@ toughcrowd issue new "Production checkout fails for saved cards" \
   --repository-id 22222222-2222-4222-8222-222222222222
 toughcrowd issue list --state open
 toughcrowd issue show <issue-id>
+toughcrowd issue comment <issue-id> "The failure reproduces when the saved card has expired."
+toughcrowd issue comment <issue-id> "Automated observation" --json
 toughcrowd issue summary --created-from 2026-08-01T00:00:00.000Z
 ```
 
@@ -227,6 +229,10 @@ toughcrowd issue unlink-github <issue-id>
 
 Every bounded issue command accepts `--json`. API responses are validated and
 projected to documented client-facing fields before they are printed.
+
+Issue comments are append-only. Add an optional associated session with
+`--session-id`; all comments and their current capacity are visible through
+`issue show`.
 
 ## Deployments
 

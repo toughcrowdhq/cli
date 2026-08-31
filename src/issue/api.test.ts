@@ -4,6 +4,7 @@ import {
   adoptGitHubIssue,
   attachIssueSession,
   createIssue,
+  createIssueComment,
   detachIssueSession,
   getIssue,
   listIssues,
@@ -111,6 +112,43 @@ describe("issue API", () => {
       disposition: "fixed",
       note: "Shipped",
     });
+  });
+
+  it("maps comment creation with an idempotency key and optional session", async () => {
+    const fetch = createFetch(
+      [
+        { comment: createComment() },
+        {
+          comment: createComment({
+            session: { id: sessionId, title: "Race investigation" },
+          }),
+        },
+      ],
+      201,
+    );
+    const runtime = createRuntime(fetch);
+    await createIssueComment({
+      ...runtime,
+      issueId,
+      body: "Observed",
+      idempotencyKey: "comment-key",
+    });
+    await createIssueComment({
+      ...runtime,
+      issueId,
+      body: "Linked",
+      sessionId,
+      idempotencyKey: "comment-key-2",
+    });
+    expect(fetch.calls.map((call) => [call.method, call.url])).toEqual([
+      ["POST", `https://api.toughcrowd.dev/api/issues/${issueId}/comments`],
+      ["POST", `https://api.toughcrowd.dev/api/issues/${issueId}/comments`],
+    ]);
+    expect(fetch.calls[0]).toMatchObject({
+      idempotencyKey: "comment-key",
+      body: { body: "Observed" },
+    });
+    expect(fetch.calls[1].body).toEqual({ body: "Linked", sessionId });
   });
 
   it("maps verification, relationship, and GitHub link calls", async () => {
@@ -306,11 +344,32 @@ function createDetailResponse() {
     relationships: [createRelationship()],
     verifications: [createVerification()],
     externalLinks: [createExternalLink()],
+    comments: [],
+    commentCapacity: {
+      count: 0,
+      countLimit: 500,
+      serializedBodyBytes: 0,
+      serializedBodyBytesLimit: 2_000_000,
+      acceptingComments: true,
+    },
     repository: {
       id: repositoryId,
       fullName: "acme/web",
       defaultBranch: "main",
     },
+  };
+}
+
+function createComment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "99999999-9999-4999-8999-999999999999",
+    issueId,
+    body: "Observed",
+    createdAt: "2026-08-18T20:04:00.000Z",
+    createdBy: { id: repositoryId, name: "Ada" },
+    submittedVia: { type: "browser" },
+    session: null,
+    ...overrides,
   };
 }
 
@@ -339,7 +398,10 @@ interface FetchCall {
   idempotencyKey?: string;
 }
 
-function createFetch(responses: readonly unknown[]): FetchLike & {
+function createFetch(
+  responses: readonly unknown[],
+  status = 200,
+): FetchLike & {
   calls: FetchCall[];
 } {
   const calls: FetchCall[] = [];
@@ -356,7 +418,7 @@ function createFetch(responses: readonly unknown[]): FetchLike & {
     const responseBody = responses[calls.length - 1];
     return Promise.resolve(
       new Response(JSON.stringify(responseBody), {
-        status: 200,
+        status,
         headers: { "content-type": "application/json" },
       }),
     );

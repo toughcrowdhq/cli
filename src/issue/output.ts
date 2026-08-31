@@ -1,6 +1,8 @@
 import type {
   CountResponse,
   CreateIssueResponse,
+  IssueComment,
+  IssueCommentResponse,
   DetachedRelationshipResponse,
   GitHubLinkResponse,
   Issue,
@@ -74,6 +76,21 @@ export function printIssueDetail(
   stdout.write(`Verifications: ${detail.verifications.length}\n`);
   stdout.write(`External links: ${detail.externalLinks.length}\n`);
   stdout.write(`Events: ${detail.events.length}\n`);
+  stdout.write(
+    `Comment capacity: ${detail.commentCapacity.count}/${detail.commentCapacity.countLimit}; ${detail.commentCapacity.serializedBodyBytes}/${detail.commentCapacity.serializedBodyBytesLimit} bytes; ${detail.commentCapacity.acceptingComments ? "accepting comments" : "comments closed"}\n`,
+  );
+  stdout.write(`Comments: ${detail.comments.length}\n`);
+  for (const comment of detail.comments) printComment(stdout, comment);
+}
+
+export function printCreatedIssueComment(
+  stdout: Writable,
+  result: IssueCommentResponse,
+  json: boolean,
+): void {
+  if (json) return printJson(stdout, result);
+  stdout.write("Issue comment created\n");
+  printComment(stdout, result.comment);
 }
 
 export function printUpdatedIssue(
@@ -207,6 +224,41 @@ function formatColumn(value: string, width: number): string {
 }
 
 function formatValue(value: string, maximumLength: number): string {
+  const safe = formatTerminalValue(value);
+  return safe.length <= maximumLength
+    ? safe
+    : `${safe.slice(0, maximumLength - 3)}...`;
+}
+
+function printComment(stdout: Writable, comment: IssueComment): void {
+  stdout.write(`Comment ID: ${comment.id}\n`);
+  stdout.write(`Issue ID: ${comment.issueId}\n`);
+  stdout.write(`Author: ${formatTerminalValue(comment.createdBy.name)}\n`);
+  stdout.write(`Created: ${comment.createdAt}\n`);
+  stdout.write(`Submitted via: ${formatProvenance(comment)}\n`);
+  if (comment.session != null) {
+    stdout.write(
+      `Session: ${comment.session.id}${comment.session.title == null ? "" : ` (${formatTerminalValue(comment.session.title)})`}\n`,
+    );
+  }
+  stdout.write("Body:\n");
+  stdout.write(`${formatMultilineValue(comment.body)}\n`);
+}
+
+function formatProvenance(comment: IssueComment): string {
+  return comment.submittedVia.type === "browser"
+    ? "browser"
+    : `API key (${formatTerminalValue(comment.submittedVia.name)})`;
+}
+
+function formatMultilineValue(value: string): string {
+  return value
+    .split(/\r\n|\r|\n/u)
+    .map(formatTerminalValue)
+    .join("\n");
+}
+
+function formatTerminalValue(value: string): string {
   let safe = "";
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -219,7 +271,5 @@ function formatValue(value: string, maximumLength: number): string {
         ? " "
         : character;
   }
-  return safe.length <= maximumLength
-    ? safe
-    : `${safe.slice(0, maximumLength - 3)}...`;
+  return safe;
 }

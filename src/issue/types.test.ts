@@ -77,6 +77,14 @@ describe("issue response decoding", () => {
       relationships: [],
       verifications: [],
       externalLinks: [],
+      comments: [],
+      commentCapacity: {
+        count: 0,
+        countLimit: 500,
+        serializedBodyBytes: 0,
+        serializedBodyBytesLimit: 2_000_000,
+        acceptingComments: true,
+      },
       repository: {
         id: repositoryId,
         fullName: "acme/web",
@@ -92,6 +100,54 @@ describe("issue response decoding", () => {
       createdAt: "2026-08-18T20:01:02.000Z",
     });
     expect(result.events[0]).not.toHaveProperty("payload");
+  });
+
+  it("validates issue comments and capacity metadata", () => {
+    const comment = {
+      id: "55555555-5555-4555-8555-555555555555",
+      issueId,
+      body: "A comment",
+      createdAt: "2026-08-18T20:01:02.000Z",
+      createdBy: { id: repositoryId, name: "Ada" },
+      submittedVia: { type: "api_key", name: "CI" },
+      session: { id: repositoryId, title: null },
+    };
+    const detail = {
+      issue: createIssue(),
+      events: [],
+      relationships: [],
+      verifications: [],
+      externalLinks: [],
+      comments: [comment],
+      commentCapacity: {
+        count: 1,
+        countLimit: 500,
+        serializedBodyBytes: 42,
+        serializedBodyBytesLimit: 2_000_000,
+        acceptingComments: true,
+      },
+      repository: null,
+    };
+    expect(decodeIssueDetail(detail).comments[0]).toEqual(comment);
+    expect(() =>
+      decodeIssueDetail({
+        ...detail,
+        comments: [comment, comment],
+        commentCapacity: { ...detail.commentCapacity, count: 2 },
+      }),
+    ).toThrow("issue comments are inconsistent");
+    expect(() =>
+      decodeIssueDetail({
+        ...detail,
+        comments: [{ ...comment, issueId: repositoryId }],
+      }),
+    ).toThrow("issue comments are inconsistent");
+    expect(() =>
+      decodeIssueDetail({
+        ...detail,
+        commentCapacity: { ...detail.commentCapacity, count: 2 },
+      }),
+    ).toThrow("issue comments are inconsistent");
   });
 });
 

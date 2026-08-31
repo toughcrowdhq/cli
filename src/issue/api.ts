@@ -5,6 +5,7 @@ import {
 } from "../api/request.js";
 import {
   decodeCreateIssueResponse,
+  decodeIssueCommentResponse,
   decodeDetachedRelationshipResponse,
   decodeGitHubLinkResponse,
   decodeIssueDetail,
@@ -17,6 +18,7 @@ import {
   decodeVerificationResponse,
   type CountResponse,
   type CreateIssueResponse,
+  type IssueCommentResponse,
   type DetachedRelationshipResponse,
   type GitHubLinkResponse,
   type IssueDetail,
@@ -92,6 +94,28 @@ export function getIssue(
     method: "GET",
     path: issuePath(options.issueId),
     decode: decodeIssueDetail,
+  });
+}
+
+export interface CreateIssueCommentRequest {
+  issueId: string;
+  body: string;
+  sessionId?: string;
+  idempotencyKey: string;
+}
+
+export function createIssueComment(
+  options: IssueApiRuntime<IssueCommentResponse> & CreateIssueCommentRequest,
+): Promise<IssueCommentResponse> {
+  return issueRequest(options, {
+    method: "POST",
+    path: `${issuePath(options.issueId)}/comments`,
+    idempotencyKey: options.idempotencyKey,
+    body: {
+      body: options.body,
+      ...(options.sessionId == null ? {} : { sessionId: options.sessionId }),
+    },
+    decode: decodeIssueCommentResponse,
   });
 }
 

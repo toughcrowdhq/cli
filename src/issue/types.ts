@@ -94,7 +94,44 @@ export interface IssueDetail {
   relationships: readonly IssueRelationship[];
   verifications: readonly IssueVerification[];
   externalLinks: readonly ExternalIssueLink[];
+  comments: readonly IssueComment[];
+  commentCapacity: IssueCommentCapacity;
   repository: IssueRepository | null;
+}
+
+export interface IssueCommentAuthor {
+  id: string;
+  name: string;
+}
+
+export type IssueCommentSubmittedVia =
+  { type: "browser" } | { type: "api_key"; name: string };
+
+export interface IssueCommentSession {
+  id: string;
+  title: string | null;
+}
+
+export interface IssueComment {
+  id: string;
+  issueId: string;
+  body: string;
+  createdAt: string;
+  createdBy: IssueCommentAuthor;
+  submittedVia: IssueCommentSubmittedVia;
+  session: IssueCommentSession | null;
+}
+
+export interface IssueCommentCapacity {
+  count: number;
+  countLimit: number;
+  serializedBodyBytes: number;
+  serializedBodyBytesLimit: number;
+  acceptingComments: boolean;
+}
+
+export interface IssueCommentResponse {
+  comment: IssueComment;
 }
 
 export interface IssueList {
@@ -201,27 +238,119 @@ export function decodeIssueDetail(value: unknown): IssueDetail {
     !Array.isArray(value.events) ||
     !Array.isArray(value.relationships) ||
     !Array.isArray(value.verifications) ||
-    !Array.isArray(value.externalLinks)
+    !Array.isArray(value.externalLinks) ||
+    !Array.isArray(value.comments)
   ) {
     throw new TypeError("issue detail response is invalid");
   }
   const relationships = value.relationships.map(decodeRelationship);
   const verifications = value.verifications.map(decodeVerification);
   const externalLinks = value.externalLinks.map(decodeExternalLink);
+  const issue = decodeIssue(value.issue, {
+    relationships,
+    verifications,
+    externalLinks,
+  });
+  const comments = value.comments.map(decodeIssueComment);
+  const commentCapacity = decodeIssueCommentCapacity(value.commentCapacity);
+  if (
+    new Set(comments.map((comment) => comment.id)).size !== comments.length ||
+    comments.some((comment) => comment.issueId !== issue.id) ||
+    commentCapacity.count !== comments.length ||
+    commentCapacity.count > commentCapacity.countLimit ||
+    commentCapacity.serializedBodyBytes >
+      commentCapacity.serializedBodyBytesLimit
+  ) {
+    throw new TypeError("issue comments are inconsistent");
+  }
   const repository =
     value.repository === null ? null : decodeRepository(value.repository);
   return {
-    issue: decodeIssue(value.issue, {
-      relationships,
-      verifications,
-      externalLinks,
-      repositoryFullName: repository?.fullName,
-    }),
+    issue: {
+      ...issue,
+      ...(repository == null
+        ? {}
+        : { repositoryFullName: repository.fullName }),
+    },
     events: value.events.map(decodeEvent),
     relationships,
     verifications,
     externalLinks,
+    comments,
+    commentCapacity,
     repository,
+  };
+}
+
+export function decodeIssueCommentResponse(
+  value: unknown,
+): IssueCommentResponse {
+  if (!isRecord(value)) {
+    throw new TypeError("issue comment response is invalid");
+  }
+  return { comment: decodeIssueComment(value.comment) };
+}
+
+function decodeIssueComment(value: unknown): IssueComment {
+  if (!isRecord(value)) throw new TypeError("issue comment is invalid");
+  const session =
+    value.session === null ? null : decodeIssueCommentSession(value.session);
+  return {
+    id: readUuid(value.id),
+    issueId: readUuid(value.issueId),
+    body: readString(value.body, 10_000, false),
+    createdAt: readTimestamp(value.createdAt),
+    createdBy: decodeIssueCommentAuthor(value.createdBy),
+    submittedVia: decodeIssueCommentSubmittedVia(value.submittedVia),
+    session,
+  };
+}
+
+function decodeIssueCommentAuthor(value: unknown): IssueCommentAuthor {
+  if (!isRecord(value)) throw new TypeError("issue comment author is invalid");
+  return { id: readUuid(value.id), name: readString(value.name, 500, false) };
+}
+
+function decodeIssueCommentSubmittedVia(
+  value: unknown,
+): IssueCommentSubmittedVia {
+  if (!isRecord(value)) {
+    throw new TypeError("issue comment provenance is invalid");
+  }
+  if (value.type === "browser") {
+    return { type: "browser" };
+  }
+  if (value.type === "api_key" && typeof value.name === "string") {
+    return { type: "api_key", name: readString(value.name, 500, false) };
+  }
+  throw new TypeError("issue comment provenance is invalid");
+}
+
+function decodeIssueCommentSession(value: unknown): IssueCommentSession {
+  if (!isRecord(value)) throw new TypeError("issue comment session is invalid");
+  const title = readNullableString(value.title, 500);
+  if (title === undefined) {
+    throw new TypeError("issue comment session is invalid");
+  }
+  return { id: readUuid(value.id), title };
+}
+
+function decodeIssueCommentCapacity(value: unknown): IssueCommentCapacity {
+  if (!isRecord(value) || typeof value.acceptingComments !== "boolean") {
+    throw new TypeError("issue comment capacity is invalid");
+  }
+  return {
+    count: readNonnegativeInteger(value.count, "comment count"),
+    countLimit: readPositiveInteger(value.countLimit, "comment count limit"),
+    serializedBodyBytes: readNonnegativeInteger(
+      value.serializedBodyBytes,
+      "comment bytes",
+    ),
+    serializedBodyBytesLimit: readPositiveInteger(
+      value.serializedBodyBytesLimit,
+      "comment byte limit",
+    ),
+    acceptingComments: value.acceptingComments,
   };
 }
 

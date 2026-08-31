@@ -330,6 +330,7 @@ command family follows the server's optimistic-concurrency contract:
 toughcrowd issue list
 toughcrowd issue new <description> --repository-id <repository-id>
 toughcrowd issue show <issue-id>
+toughcrowd issue comment <issue-id> <body> [--session-id <session-id>]
 toughcrowd issue update <issue-id> --issue-version <version>
 toughcrowd issue resolve <issue-id> --issue-version <version> --disposition <disposition>
 toughcrowd issue reopen <issue-id> --issue-version <version>

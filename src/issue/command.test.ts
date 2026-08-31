@@ -24,6 +24,7 @@ const issueNamespaceHelp =
     "Commands:",
     "  list [options]                                    List issues",
     "  new [options] <description>                       Create an issue",
+    "  comment [options] <issue-id> <body>               Add an append-only issue comment",
     "  show [options] <issue-id>                         Show issue detail",
     "  update [options] <issue-id>                       Update an issue",
     "  resolve [options] <issue-id>                      Resolve an issue",
@@ -74,6 +75,7 @@ describe("issue commands", () => {
         "--json",
       ],
       ["issue", "show", issueId, "--json"],
+      ["issue", "comment", issueId, "Observed", "--json"],
       [
         "issue",
         "update",
@@ -170,6 +172,7 @@ describe("issue commands", () => {
       ],
       ["POST", "https://api.toughcrowd.dev/api/issues"],
       ["GET", `https://api.toughcrowd.dev/api/issues/${issueId}`],
+      ["POST", `https://api.toughcrowd.dev/api/issues/${issueId}/comments`],
       ["PATCH", `https://api.toughcrowd.dev/api/issues/${issueId}`],
       ["POST", `https://api.toughcrowd.dev/api/issues/${issueId}/resolution`],
       [
@@ -207,7 +210,7 @@ describe("issue commands", () => {
       ],
     ]);
     expect(fetch.calls[1].idempotencyKey).toBe("issue-idempotency-key");
-    expect(fetch.calls[10].body).toEqual({
+    expect(fetch.calls[11].body).toEqual({
       externalScopeId: "123",
       externalIssueId: "456",
       externalKey: "#42",
@@ -281,6 +284,42 @@ describe("issue commands", () => {
     expect(runtime.stderr.output).toBe(
       "Not authenticated for https://api.toughcrowd.dev. Run `toughcrowd auth login` or set TOUGHCROWD_API_KEY.\n",
     );
+  });
+
+  it("trims comments, generates one idempotency key, and prints safe output", async () => {
+    const fetch = createIssueFetch();
+    let keys = 0;
+    const runtime = {
+      ...createAuthenticatedRuntime(fetch),
+      createIdempotencyKey: () => {
+        keys += 1;
+        return "comment-key";
+      },
+    };
+    expect(
+      await runCli(
+        ["issue", "comment", issueId, "  first\\nsecond\\u001b[31m  "],
+        runtime,
+      ),
+    ).toBe(0);
+    expect(keys).toBe(1);
+    expect(fetch.calls[0]).toMatchObject({
+      body: { body: "first\\nsecond\\u001b[31m" },
+      idempotencyKey: "comment-key",
+    });
+    expect(runtime.stdout.output).toContain("Issue comment created\n");
+    expect(runtime.stdout.output).not.toContain("\u001b");
+  });
+
+  it("rejects invalid comment bodies before fetching", async () => {
+    const fetch = createIssueFetch();
+    for (const body of ["   ", "a".repeat(10_001), "😀".repeat(10_001)]) {
+      const runtime = createAuthenticatedRuntime(fetch);
+      expect(await runCli(["issue", "comment", issueId, body], runtime)).toBe(
+        1,
+      );
+    }
+    expect(fetch.calls).toEqual([]);
   });
 
   it("does not expose server details from 5xx or malformed success responses", async () => {
@@ -394,6 +433,7 @@ function createStaticFetch(body: unknown, status = 200): FetchLike {
 
 function responseFor(call: FetchCall): unknown {
   const issue = createIssueRecord();
+  if (call.url.endsWith("/comments")) return { comment: createComment() };
   if (call.url.includes("/summary")) return createSummaryResponse();
   if (call.url.endsWith("/verifications")) {
     return { verification: createVerification() };
@@ -437,6 +477,26 @@ function createIssueRecord() {
     relationships: [],
     verifications: [],
     externalLinks: [],
+    comments: [],
+    commentCapacity: {
+      count: 0,
+      countLimit: 500,
+      serializedBodyBytes: 0,
+      serializedBodyBytesLimit: 2_000_000,
+      acceptingComments: true,
+    },
+  };
+}
+
+function createComment() {
+  return {
+    id: "99999999-9999-4999-8999-999999999999",
+    issueId,
+    body: "Observed",
+    createdAt: "2026-08-18T20:04:00.000Z",
+    createdBy: { id: repositoryId, name: "Ada" },
+    submittedVia: { type: "browser" },
+    session: null,
   };
 }
 
@@ -506,6 +566,14 @@ function createDetailResponse() {
     relationships: [],
     verifications: [],
     externalLinks: [],
+    comments: [],
+    commentCapacity: {
+      count: 0,
+      countLimit: 500,
+      serializedBodyBytes: 0,
+      serializedBodyBytesLimit: 2_000_000,
+      acceptingComments: true,
+    },
     repository: {
       id: repositoryId,
       fullName: "acme/web",

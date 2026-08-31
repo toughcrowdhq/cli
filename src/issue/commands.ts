@@ -5,6 +5,7 @@ import {
   adoptGitHubIssue,
   attachIssueSession,
   createIssue,
+  createIssueComment,
   detachIssueSession,
   getIssue,
   listIssues,
@@ -19,6 +20,7 @@ import {
   type AdoptGitHubIssueRequest,
   type AttachIssueSessionRequest,
   type CreateIssueRequest,
+  type CreateIssueCommentRequest,
   type ListIssuesRequest,
   type ResolveIssueRequest,
   type SummarizeIssuesRequest,
@@ -29,6 +31,7 @@ import { IssueCommandError } from "./errors.js";
 import {
   printCount,
   printCreatedIssue,
+  printCreatedIssueComment,
   printDetachedRelationship,
   printGitHubLink,
   printIssueDetail,
@@ -50,6 +53,11 @@ interface JsonOption {
 export type ListIssueCommandOptions = ListIssuesRequest & JsonOption;
 export type CreateIssueCommandOptions = Omit<
   CreateIssueRequest,
+  "idempotencyKey"
+> &
+  JsonOption;
+export type CommentIssueCommandOptions = Omit<
+  CreateIssueCommentRequest,
   "idempotencyKey"
 > &
   JsonOption;
@@ -105,6 +113,30 @@ export async function createIssueCommand(
     });
     printCreatedIssue(runtime.stdout, result, options.json === true);
   });
+}
+
+export async function commentIssueCommand(
+  runtime: CreateIssueRuntime,
+  options: CommentIssueCommandOptions,
+): Promise<void> {
+  await runIssueOperation(
+    "create issue comment",
+    runtime,
+    async (apiRuntime) => {
+      const body = validateCommentBody(options.body);
+      const idempotencyKey = readIdempotencyKey(
+        runtime.createIdempotencyKey(),
+        "issue comment",
+      );
+      const result = await createIssueComment({
+        ...issueApiRuntime(apiRuntime),
+        ...options,
+        body,
+        idempotencyKey,
+      });
+      printCreatedIssueComment(runtime.stdout, result, options.json === true);
+    },
+  );
 }
 
 export async function showIssueCommand(
@@ -316,14 +348,34 @@ async function runIssueOperation(
   }
 }
 
-function readIdempotencyKey(value: string): string {
+function readIdempotencyKey(value: string, subject = "issue"): string {
   const key = value.trim();
   if (key.length === 0 || key.length > 200) {
     throw new IssueCommandError(
-      "Could not create issue: failed to generate an idempotency key.",
+      `Could not create ${subject}: failed to generate an idempotency key.`,
     );
   }
   return key;
+}
+
+function validateCommentBody(value: string): string {
+  const body = value.trim();
+  if (body.length === 0) {
+    throw new IssueCommandError(
+      "Could not create issue comment: comment body must not be empty.",
+    );
+  }
+  if (body.length > 10_000) {
+    throw new IssueCommandError(
+      "Could not create issue comment: comment body must be at most 10,000 characters.",
+    );
+  }
+  if (Buffer.byteLength(body, "utf8") > 40_000) {
+    throw new IssueCommandError(
+      "Could not create issue comment: comment body must be at most 40,000 UTF-8 bytes.",
+    );
+  }
+  return body;
 }
 
 function issueApiRuntime(

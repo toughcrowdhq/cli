@@ -4,6 +4,7 @@ import {
   adoptGitHubIssueCommand,
   attachIssueSessionCommand,
   createIssueCommand,
+  commentIssueCommand,
   detachIssueSessionCommand,
   listIssueCommand,
   mirrorGitHubIssueCommand,
@@ -33,6 +34,7 @@ export function createIssueCommandGroup(runtime: CreateIssueRuntime): Command {
     .description("Work with Tough Crowd issues")
     .addCommand(createListCommand(runtime))
     .addCommand(createNewCommand(runtime))
+    .addCommand(createCommentCommand(runtime))
     .addCommand(createShowCommand(runtime))
     .addCommand(createUpdateCommand(runtime))
     .addCommand(createResolveCommand(runtime))
@@ -45,6 +47,28 @@ export function createIssueCommandGroup(runtime: CreateIssueRuntime): Command {
     .addCommand(createRetryGitHubCommand(runtime))
     .addCommand(createUnlinkGitHubCommand(runtime))
     .addCommand(createSummaryCommand(runtime));
+}
+
+function createCommentCommand(runtime: CreateIssueRuntime): Command {
+  return command("comment", "Add an append-only issue comment")
+    .argument("<issue-id>", "issue ID")
+    .argument("<body>", "comment body")
+    .option("--session-id <id>", "associated session ID")
+    .option("--json", "print machine-readable JSON")
+    .action(
+      async (
+        issueId: string,
+        body: string,
+        options: { sessionId?: string; json?: boolean },
+      ) => {
+        await commentIssueCommand(runtime, {
+          issueId,
+          body,
+          sessionId: options.sessionId,
+          json: options.json === true,
+        });
+      },
+    );
 }
 
 function createListCommand(runtime: CreateIssueRuntime): Command {

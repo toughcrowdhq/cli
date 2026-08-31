@@ -1,0 +1,9 @@
+version: 1
+
+reviews:
+  addy-code-review:
+    agentProfile: codex-cli-chatgpt
+    model: gpt-5.6-sol
+    reasoningEffort: high
+    instructions: addy-code-review.md
+    failOn: warnings

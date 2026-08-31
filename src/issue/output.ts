@@ -186,6 +186,8 @@ function printJson(stdout: Writable, value: unknown): void {
 function printIssueFields(stdout: Writable, issue: Issue): void {
   stdout.write(`ID: ${issue.id}\n`);
   stdout.write(`State: ${issue.state}\n`);
+  stdout.write(`Type: ${issue.type}\n`);
+  stdout.write(`Priority: ${issue.priority ?? "none"}\n`);
   stdout.write(`Version: ${issue.version}\n`);
   stdout.write(
     `Repository: ${formatValue(issue.repositoryFullName ?? issue.githubRepositoryId, 255)}\n`,

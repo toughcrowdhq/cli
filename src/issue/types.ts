@@ -1,6 +1,21 @@
 export const issueStates = ["open", "resolved"] as const;
 export type IssueState = (typeof issueStates)[number];
 
+export const issueTypes = ["bug", "feature", "task"] as const;
+export type IssueType = (typeof issueTypes)[number];
+
+export const issuePriorities = ["urgent", "high", "medium", "low"] as const;
+export type IssuePriority = (typeof issuePriorities)[number];
+
+export const issueSeverities = ["critical", "high", "medium", "low"] as const;
+export type IssueSeverity = (typeof issueSeverities)[number];
+
+export type IssueCategorization = {
+  type: IssueType;
+  priority: IssuePriority | null;
+  severity: IssueSeverity | null;
+};
+
 export const issueDispositions = [
   "fixed",
   "duplicate",
@@ -25,6 +40,9 @@ export interface Issue {
   githubRepositoryId: string;
   title: string | null;
   description: string;
+  type: IssueType;
+  priority: IssuePriority | null;
+  severity: IssueSeverity | null;
   state: IssueState;
   resolutionDisposition: IssueDisposition | null;
   resolutionNote: string | null;
@@ -436,6 +454,9 @@ function decodeIssue(
   );
   const resolutionNote = readNullableString(value.resolutionNote, 2_000);
   const state = readChoice(value.state, issueStates);
+  const type = readChoice(value.type, issueTypes);
+  const priority = readNullableChoice(value.priority, issuePriorities);
+  const severity = readNullableChoice(value.severity, issueSeverities);
   const repositoryFullName =
     projections?.repositoryFullName ??
     readOptionalString(value.repositoryFullName, 255);
@@ -443,7 +464,10 @@ function decodeIssue(
     title === undefined ||
     resolutionDisposition === undefined ||
     resolutionNote === undefined ||
-    state == null
+    state == null ||
+    type == null ||
+    priority === undefined ||
+    severity === undefined
   ) {
     throw new TypeError("issue is invalid");
   }
@@ -452,6 +476,9 @@ function decodeIssue(
     githubRepositoryId: readUuid(value.githubRepositoryId),
     title,
     description: readString(value.description, 20_000, false),
+    type,
+    priority,
+    severity,
     state,
     resolutionDisposition,
     resolutionNote,

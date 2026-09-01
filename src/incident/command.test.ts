@@ -170,6 +170,25 @@ describe("incident commands", () => {
     expect(fetch.calls[2].body).toEqual({ title: "Updated" });
   });
 
+  it("requires a repository for create before fetching", async () => {
+    const fetch = createIncidentFetch();
+    const runtime = createAuthenticatedRuntime(fetch);
+    runtime.readGitOrigin = () =>
+      Promise.resolve("git@gitlab.com:acme/web.git");
+
+    const exitCode = await runCli(
+      ["incident", "create", "Checkout is down", "--title", "Outage"],
+      runtime,
+    );
+
+    expect(exitCode).toBe(2);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toBe(
+      "Repository is required. Use --repo <owner/name>, set TOUGHCROWD_REPO, or run the command in a GitHub checkout with an origin remote.\n",
+    );
+    expect(fetch.calls).toEqual([]);
+  });
+
   it("prints JSON for nested note updates", async () => {
     const fetch = createIncidentFetch();
     const runtime = createAuthenticatedRuntime(fetch);

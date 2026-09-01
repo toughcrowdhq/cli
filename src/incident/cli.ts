@@ -224,12 +224,15 @@ function createNoteUpdateCommand(runtime: CreateIncidentRuntime): Command {
         noteId: string,
         body: string,
         options: { json?: boolean },
+        actionCommand: Command,
       ) => {
         await updateIncidentNoteCommand(runtime, {
           incidentId,
           noteId,
           body,
-          json: options.json === true,
+          json:
+            options.json === true ||
+            actionCommand.parent?.opts<{ json?: boolean }>().json === true,
         });
       },
     );

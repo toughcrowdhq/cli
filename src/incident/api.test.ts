@@ -47,6 +47,7 @@ describe("incident API", () => {
     await updateIncident({
       ...runtime,
       incidentId,
+      repo: "acme/api",
       state: "resolved",
       resolutionSummary: "Rolled back",
     });
@@ -61,7 +62,7 @@ describe("incident API", () => {
     expect(fetch.calls.map((call) => [call.method, call.url])).toEqual([
       [
         "GET",
-        "https://api.toughcrowd.dev/api/incidents?state=active&severity=p1&repo=acme%2Fweb&limit=25&cursor=opaque",
+        "https://api.toughcrowd.dev/api/incidents?state=active&severity=p1&repositoryFullName=acme%2Fweb&limit=25&cursor=opaque",
       ],
       ["POST", "https://api.toughcrowd.dev/api/incidents"],
       ["GET", `https://api.toughcrowd.dev/api/incidents/${incidentId}`],
@@ -79,12 +80,13 @@ describe("incident API", () => {
     expect(fetch.calls[1].body).toEqual({
       summary: "Checkout is down",
       title: "Checkout outage",
-      repo: "acme/web",
+      repositoryFullName: "acme/web",
       severity: "p1",
       state: "active",
     });
     expect(fetch.calls[1].idempotencyKey).toBeUndefined();
     expect(fetch.calls[4].body).toEqual({
+      repositoryFullName: "acme/api",
       state: "resolved",
       resolutionSummary: "Rolled back",
     });
@@ -136,7 +138,9 @@ function createFetch(responses: unknown[]): FetchLike & { calls: FetchCall[] } {
 function createIncidentRecord(overrides: Record<string, unknown> = {}) {
   return {
     id: incidentId,
-    repository: "acme/web",
+    repositoryFullName: "acme/web",
+    createdByUserId: "33333333-3333-4333-8333-333333333333",
+    updatedByUserId: null,
     title: "Checkout outage",
     summary: "Checkout is down",
     severity: "p1",
@@ -145,8 +149,6 @@ function createIncidentRecord(overrides: Record<string, unknown> = {}) {
     createdAt: "2026-08-18T20:01:02.000Z",
     updatedAt: "2026-08-18T20:02:02.000Z",
     resolvedAt: null,
-    createdBy: { id: "33333333-3333-4333-8333-333333333333", name: "Ada" },
-    updatedBy: null,
     ...overrides,
   };
 }

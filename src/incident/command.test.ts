@@ -90,7 +90,7 @@ describe("incident commands", () => {
       ["POST", "https://api.toughcrowd.dev/api/incidents"],
       [
         "GET",
-        "https://api.toughcrowd.dev/api/incidents?state=active&severity=p1&repo=acme%2Fweb&limit=25&cursor=opaque",
+        "https://api.toughcrowd.dev/api/incidents?state=active&severity=p1&repositoryFullName=acme%2Fweb&limit=25&cursor=opaque",
       ],
       ["GET", `https://api.toughcrowd.dev/api/incidents/${incidentId}`],
       [
@@ -108,7 +108,7 @@ describe("incident commands", () => {
       body: {
         summary: "Checkout is down",
         title: "Checkout outage",
-        repo: "acme/web",
+        repositoryFullName: "acme/web",
         severity: "p1",
       },
       idempotencyKey: undefined,
@@ -163,9 +163,28 @@ describe("incident commands", () => {
       ),
     ).toBe(0);
 
-    expect(fetch.calls[0].body).toMatchObject({ repo: "env/repo" });
+    expect(fetch.calls[0].body).toMatchObject({
+      repositoryFullName: "env/repo",
+    });
     expect(fetch.calls[1].url).toBe("https://api.toughcrowd.dev/api/incidents");
     expect(fetch.calls[2].body).toEqual({ title: "Updated" });
+  });
+
+  it("prints JSON for nested note updates", async () => {
+    const fetch = createIncidentFetch();
+    const runtime = createAuthenticatedRuntime(fetch);
+
+    expect(
+      await runCli(
+        ["incident", "note", "update", incidentId, noteId, "Edited", "--json"],
+        runtime,
+      ),
+    ).toBe(0);
+
+    expect(JSON.parse(runtime.stdout.output)).toEqual({
+      note: createNote({ body: "Edited" }),
+    });
+    expect(runtime.stderr.output).toBe("");
   });
 
   it("rejects invalid choices, pagination, and no-op updates before fetching", async () => {
@@ -326,7 +345,9 @@ function responseFor(call: FetchCall): unknown {
 function createIncident() {
   return {
     id: incidentId,
-    repository: "acme/web",
+    repositoryFullName: "acme/web",
+    createdByUserId: "33333333-3333-4333-8333-333333333333",
+    updatedByUserId: null,
     title: "Checkout outage",
     summary: "Checkout is down",
     severity: "p1",
@@ -335,8 +356,6 @@ function createIncident() {
     createdAt: "2026-08-18T20:01:02.000Z",
     updatedAt: "2026-08-18T20:02:02.000Z",
     resolvedAt: null,
-    createdBy: { id: "33333333-3333-4333-8333-333333333333", name: "Ada" },
-    updatedBy: null,
   };
 }
 

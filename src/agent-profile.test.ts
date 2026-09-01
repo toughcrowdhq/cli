@@ -4,7 +4,10 @@ import {
   validateSelection,
   type AgentProfileCatalog,
 } from "./agent-profile.js";
-import { formatConfigSetFailure } from "./cli.js";
+import {
+  formatAgentProfileListFailure,
+  formatConfigSetFailure,
+} from "./cli.js";
 
 const catalog: AgentProfileCatalog = {
   profiles: [
@@ -59,5 +62,36 @@ describe("formatConfigSetFailure", () => {
       "Could not set configuration: the Tough Crowd API returned an internal error.",
     );
     expect(message).not.toContain("password");
+  });
+});
+
+describe("formatAgentProfileListFailure", () => {
+  it.each([
+    ["timeout", "Could not list Agent Profiles: the API request timed out."],
+    [
+      "network",
+      "Could not list Agent Profiles: could not reach the Tough Crowd API.",
+    ],
+  ] as const)("formats %s failures", (kind, expected) => {
+    expect(
+      formatAgentProfileListFailure(
+        new ApiClientError({ kind, message: "sensitive connection detail" }),
+      ).message,
+    ).toBe(expected);
+  });
+
+  it("preserves bounded authentication guidance", () => {
+    expect(
+      formatAgentProfileListFailure(
+        new ApiClientError({
+          kind: "api",
+          status: 401,
+          code: "authentication-required",
+          message: "The API key has been revoked.",
+        }),
+      ).message,
+    ).toBe(
+      "Authentication failed: The API key has been revoked. Run `toughcrowd auth login` or set TOUGHCROWD_API_KEY.",
+    );
   });
 });

@@ -476,9 +476,7 @@ function createAgentProfileCommand(runtime: CliRuntime): Command {
           if (error instanceof SessionCommandError) {
             throw error;
           }
-          throw new SessionCommandError(
-            "Could not list Agent Profiles: the Tough Crowd API returned an invalid response.",
-          );
+          throw formatAgentProfileListFailure(error);
         }
         if (options.json === true) {
           runtime.stdout.write(`${JSON.stringify(profiles)}\n`);
@@ -501,6 +499,47 @@ function createAgentProfileCommand(runtime: CliRuntime): Command {
       }),
   );
   return configureCommandTree(command, runtime);
+}
+
+export function formatAgentProfileListFailure(
+  error: unknown,
+): SessionCommandError {
+  if (error instanceof ApiClientError) {
+    if (error.kind === "canceled") {
+      return new SessionCommandError("Agent Profile listing canceled.", 130);
+    }
+    if (error.kind === "timeout") {
+      return new SessionCommandError(
+        "Could not list Agent Profiles: the API request timed out.",
+      );
+    }
+    if (error.kind === "network") {
+      return new SessionCommandError(
+        "Could not list Agent Profiles: could not reach the Tough Crowd API.",
+      );
+    }
+    if (
+      error.kind === "api" &&
+      (error.status === 401 || error.code === "authentication-required")
+    ) {
+      return new SessionCommandError(
+        `Authentication failed: ${error.message} Run \`toughcrowd auth login\` or set TOUGHCROWD_API_KEY.`,
+      );
+    }
+    if (error.status != null && error.status >= 500) {
+      return new SessionCommandError(
+        "Could not list Agent Profiles: the Tough Crowd API returned an internal error.",
+      );
+    }
+    if (error.kind === "api") {
+      return new SessionCommandError(
+        `Could not list Agent Profiles: ${error.message}`,
+      );
+    }
+  }
+  return new SessionCommandError(
+    "Could not list Agent Profiles: the Tough Crowd API returned an invalid response.",
+  );
 }
 
 function parseListLimit(value: string): number {

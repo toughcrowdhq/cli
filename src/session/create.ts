@@ -67,6 +67,9 @@ export async function create(
           reasoningEffort: inputs.reasoningEffort?.value,
         });
       } catch (error) {
+        if (error instanceof ApiClientError) {
+          throw error;
+        }
         const message =
           error instanceof Error
             ? error.message

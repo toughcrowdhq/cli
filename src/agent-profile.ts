@@ -100,11 +100,19 @@ export function validateSelection(
   if (profile == null) {
     throw new Error(`Agent Profile ${selection.profile} is not available.`);
   }
-  if (selection.model == null) return;
-  const model = profile.models.find((entry) => entry.id === selection.model);
+  const modelId = selection.model ?? profile.defaultModel;
+  if (modelId == null) {
+    if (selection.reasoningEffort != null) {
+      throw new Error(
+        `Reasoning effort ${selection.reasoningEffort} requires a model for Agent Profile ${selection.profile}.`,
+      );
+    }
+    return;
+  }
+  const model = profile.models.find((entry) => entry.id === modelId);
   if (model == null) {
     throw new Error(
-      `Model ${selection.model} is not supported by Agent Profile ${selection.profile}.`,
+      `Model ${modelId} is not supported by Agent Profile ${selection.profile}.`,
     );
   }
   if (
@@ -113,7 +121,7 @@ export function validateSelection(
     !model.reasoningEfforts.includes(selection.reasoningEffort)
   ) {
     throw new Error(
-      `Reasoning effort ${selection.reasoningEffort} is not supported by ${selection.profile}/${selection.model}.`,
+      `Reasoning effort ${selection.reasoningEffort} is not supported by ${selection.profile}/${modelId}.`,
     );
   }
 }

@@ -5,6 +5,7 @@ import {
   Option,
 } from "commander";
 import { randomUUID } from "node:crypto";
+import { ApiClientError } from "./api/errors.js";
 import { openUrl as defaultOpenUrl } from "./browser.js";
 import { login, status, type AuthRuntime } from "./auth/commands.js";
 import type { FetchLike, TimerCapabilities } from "./api/request.js";
@@ -413,18 +414,40 @@ function createConfigCommand(runtime: CliRuntime): Command {
             reasoningEffort: config.session?.reasoningEffort,
           });
         } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "the Agent Profile catalog is invalid.";
-          throw new SessionCommandError(
-            `Could not set configuration: ${message}`,
-          );
+          throw new SessionCommandError(formatConfigSetFailure(error));
         }
         await writeConfig(config, runtime.env);
       }),
   );
   return configureCommandTree(command, runtime);
+}
+
+export function formatConfigSetFailure(error: unknown): string {
+  if (error instanceof ApiClientError) {
+    if (error.kind === "canceled") {
+      return "Configuration update canceled.";
+    }
+    if (error.kind === "timeout") {
+      return "Could not set configuration: the API request timed out.";
+    }
+    if (error.kind === "network") {
+      return "Could not set configuration: could not reach the Tough Crowd API.";
+    }
+    if (error.kind === "malformed-response") {
+      return "Could not set configuration: the Tough Crowd API returned an invalid response.";
+    }
+    if (error.status != null && error.status >= 500) {
+      return "Could not set configuration: the Tough Crowd API returned an internal error.";
+    }
+    if (error.status === 401 || error.code === "authentication-required") {
+      return `Authentication failed: ${error.message} Run \`toughcrowd auth login\` or set TOUGHCROWD_API_KEY.`;
+    }
+    return `Could not set configuration: ${error.message}`;
+  }
+  if (error instanceof Error) {
+    return `Could not set configuration: ${error.message}`;
+  }
+  return "Could not set configuration: the Agent Profile catalog is invalid.";
 }
 
 const configKeys: readonly ConfigKey[] = [

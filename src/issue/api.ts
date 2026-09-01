@@ -23,11 +23,14 @@ import {
   type GitHubLinkResponse,
   type IssueDetail,
   type IssueDisposition,
+  type IssueCategorization,
   type IssueList,
+  type IssuePriority,
   type IssueRelationshipRole,
   type IssueResponse,
   type IssueState,
   type IssueSummary,
+  type IssueType,
   type IssueVerificationResult,
   type RelationshipResponse,
   type VerificationResponse,
@@ -66,6 +69,8 @@ export interface CreateIssueRequest {
   repositoryId: string;
   description: string;
   title?: string;
+  type?: IssueType;
+  priority?: IssuePriority | null;
   mirrorToGitHub?: boolean;
   idempotencyKey: string;
 }
@@ -81,6 +86,8 @@ export function createIssue(
       repositoryId: options.repositoryId,
       description: options.description,
       ...(options.title == null ? {} : { title: options.title }),
+      ...(options.type == null ? {} : { type: options.type }),
+      ...(options.priority === undefined ? {} : { priority: options.priority }),
       mirrorToGitHub: options.mirrorToGitHub === true,
     },
     decode: decodeCreateIssueResponse,
@@ -124,6 +131,7 @@ export interface UpdateIssueRequest {
   version: number;
   title?: string;
   description?: string;
+  categorization?: IssueCategorization;
 }
 
 export function updateIssue(
@@ -138,6 +146,9 @@ export function updateIssue(
       ...(options.description == null
         ? {}
         : { description: options.description }),
+      ...(options.categorization == null
+        ? {}
+        : { categorization: options.categorization }),
     },
     decode: decodeIssueResponse,
   });

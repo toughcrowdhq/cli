@@ -40,6 +40,47 @@ const issueNamespaceHelp =
     "  help [command]                                    display help for command",
   ].join("\n") + "\n";
 
+const issueNewHelp =
+  [
+    "Usage: toughcrowd issue new [options] <description>",
+    "",
+    "Create an issue",
+    "",
+    "Arguments:",
+    "  description            issue description",
+    "",
+    "Options:",
+    "  --repository-id <id>   repository ID",
+    "  --title <title>        issue title",
+    '  --type <type>          issue type (choices: "bug", "feature", "task")',
+    '  --priority <priority>  issue priority (choices: "urgent", "high", "medium",',
+    '                         "low", "none")',
+    "  --mirror-github        also request a linked GitHub issue",
+    "  --json                 print machine-readable JSON",
+    "  -h, --help             display help for command",
+  ].join("\n") + "\n";
+
+const issueUpdateHelp =
+  [
+    "Usage: toughcrowd issue update [options] <issue-id>",
+    "",
+    "Update an issue",
+    "",
+    "Arguments:",
+    "  issue-id                     issue ID",
+    "",
+    "Options:",
+    "  --issue-version <number>     current issue version",
+    "  --title <title>              new issue title",
+    "  --description <description>  new issue description",
+    '  --type <type>                new issue type (choices: "bug", "feature",',
+    '                               "task")',
+    '  --priority <priority>        new issue priority (choices: "urgent", "high",',
+    '                               "medium", "low", "none")',
+    "  --json                       print machine-readable JSON",
+    "  -h, --help                   display help for command",
+  ].join("\n") + "\n";
+
 describe("issue commands", () => {
   it("prints literal namespace help", async () => {
     const runtime = createRuntime();
@@ -48,6 +89,26 @@ describe("issue commands", () => {
 
     expect(exitCode).toBe(0);
     expect(runtime.stdout.output).toBe(issueNamespaceHelp);
+    expect(runtime.stderr.output).toBe("");
+  });
+
+  it("documents issue categorization update options", async () => {
+    const runtime = createRuntime();
+
+    const exitCode = await runCli(["issue", "update", "--help"], runtime);
+
+    expect(exitCode).toBe(0);
+    expect(runtime.stdout.output).toBe(issueUpdateHelp);
+    expect(runtime.stderr.output).toBe("");
+  });
+
+  it("documents issue categorization creation options", async () => {
+    const runtime = createRuntime();
+
+    const exitCode = await runCli(["issue", "new", "--help"], runtime);
+
+    expect(exitCode).toBe(0);
+    expect(runtime.stdout.output).toBe(issueNewHelp);
     expect(runtime.stderr.output).toBe("");
   });
 
@@ -71,6 +132,10 @@ describe("issue commands", () => {
         repositoryId,
         "--title",
         "Checkout failure",
+        "--type",
+        "bug",
+        "--priority",
+        "high",
         "--mirror-github",
         "--json",
       ],
@@ -210,6 +275,14 @@ describe("issue commands", () => {
       ],
     ]);
     expect(fetch.calls[1].idempotencyKey).toBe("issue-idempotency-key");
+    expect(fetch.calls[1].body).toEqual({
+      repositoryId,
+      description: "Production checkout fails.",
+      title: "Checkout failure",
+      type: "bug",
+      priority: "high",
+      mirrorToGitHub: true,
+    });
     expect(fetch.calls[11].body).toEqual({
       externalScopeId: "123",
       externalIssueId: "456",
@@ -223,6 +296,34 @@ describe("issue commands", () => {
     const fetch = createIssueFetch();
     const invalidInvocations = [
       ["issue", "reopen", issueId, "--issue-version", "0"],
+      [
+        "issue",
+        "new",
+        "Invalid type",
+        "--repository-id",
+        repositoryId,
+        "--type",
+        "defect",
+      ],
+      [
+        "issue",
+        "new",
+        "Invalid priority",
+        "--repository-id",
+        repositoryId,
+        "--priority",
+        "eventually",
+      ],
+      ["issue", "update", issueId, "--issue-version", "1", "--type", "defect"],
+      [
+        "issue",
+        "update",
+        issueId,
+        "--issue-version",
+        "1",
+        "--priority",
+        "eventually",
+      ],
       [
         "issue",
         "resolve",
@@ -269,9 +370,132 @@ describe("issue commands", () => {
     expect(exitCode).toBe(2);
     expect(runtime.stdout.output).toBe("");
     expect(runtime.stderr.output).toBe(
-      "error: at least one of --title or --description is required\n",
+      "error: at least one of --title, --description, --type, or --priority is required\n",
     );
     expect(fetch.calls).toEqual([]);
+  });
+
+  it("updates type and priority while preserving unspecified categorization", async () => {
+    const fetch = createIssueFetch({
+      type: "task",
+      priority: "medium",
+      severity: null,
+    });
+    const runtime = createAuthenticatedRuntime(fetch);
+
+    const exitCode = await runCli(
+      [
+        "issue",
+        "update",
+        issueId,
+        "--issue-version",
+        "1",
+        "--type",
+        "bug",
+        "--priority",
+        "high",
+        "--json",
+      ],
+      runtime,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(runtime.stderr.output).toBe("");
+    expect(fetch.calls.map((call) => [call.method, call.url])).toEqual([
+      ["GET", `https://api.toughcrowd.dev/api/issues/${issueId}`],
+      ["PATCH", `https://api.toughcrowd.dev/api/issues/${issueId}`],
+    ]);
+    expect(fetch.calls[1].body).toEqual({
+      version: 1,
+      categorization: { type: "bug", priority: "high", severity: null },
+    });
+  });
+
+  it("creates an issue with explicitly unset priority", async () => {
+    const fetch = createIssueFetch();
+    const runtime = createAuthenticatedRuntime(fetch);
+
+    const exitCode = await runCli(
+      [
+        "issue",
+        "new",
+        "Plan the migration",
+        "--repository-id",
+        repositoryId,
+        "--type",
+        "feature",
+        "--priority",
+        "none",
+        "--json",
+      ],
+      runtime,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(runtime.stderr.output).toBe("");
+    expect(fetch.calls[0].body).toEqual({
+      repositoryId,
+      description: "Plan the migration",
+      type: "feature",
+      priority: null,
+      mirrorToGitHub: false,
+    });
+  });
+
+  it("clears priority and clears bug-only severity when changing to a non-bug type", async () => {
+    const clearPriorityFetch = createIssueFetch({
+      type: "bug",
+      priority: "urgent",
+      severity: "critical",
+    });
+    const clearPriorityRuntime = createAuthenticatedRuntime(clearPriorityFetch);
+    expect(
+      await runCli(
+        [
+          "issue",
+          "update",
+          issueId,
+          "--issue-version",
+          "1",
+          "--priority",
+          "none",
+        ],
+        clearPriorityRuntime,
+      ),
+    ).toBe(0);
+    expect(clearPriorityFetch.calls[1].body).toEqual({
+      version: 1,
+      categorization: { type: "bug", priority: null, severity: "critical" },
+    });
+
+    const changeTypeFetch = createIssueFetch({
+      type: "bug",
+      priority: "urgent",
+      severity: "critical",
+    });
+    const changeTypeRuntime = createAuthenticatedRuntime(changeTypeFetch);
+    expect(
+      await runCli(
+        [
+          "issue",
+          "update",
+          issueId,
+          "--issue-version",
+          "1",
+          "--type",
+          "feature",
+        ],
+        changeTypeRuntime,
+      ),
+    ).toBe(0);
+    expect(changeTypeFetch.calls[1].body).toEqual({
+      version: 1,
+      categorization: {
+        type: "feature",
+        priority: "urgent",
+        severity: null,
+      },
+    });
   });
 
   it("fails before a request when no credential is available", async () => {
@@ -397,7 +621,9 @@ interface FetchCall {
   idempotencyKey?: string;
 }
 
-function createIssueFetch(): FetchLike & { calls: FetchCall[] } {
+function createIssueFetch(
+  issueOverrides: Record<string, unknown> = {},
+): FetchLike & { calls: FetchCall[] } {
   const calls: FetchCall[] = [];
   const fetchImplementation = ((url: URL, init: RequestInit) => {
     const body: unknown =
@@ -411,7 +637,7 @@ function createIssueFetch(): FetchLike & { calls: FetchCall[] } {
     };
     calls.push(call);
     return Promise.resolve(
-      new Response(JSON.stringify(responseFor(call)), {
+      new Response(JSON.stringify(responseFor(call, issueOverrides)), {
         status: 200,
         headers: { "content-type": "application/json" },
       }),
@@ -431,8 +657,11 @@ function createStaticFetch(body: unknown, status = 200): FetchLike {
     );
 }
 
-function responseFor(call: FetchCall): unknown {
-  const issue = createIssueRecord();
+function responseFor(
+  call: FetchCall,
+  issueOverrides: Record<string, unknown>,
+): unknown {
+  const issue = createIssueRecord(issueOverrides);
   if (call.url.endsWith("/comments")) return { comment: createComment() };
   if (call.url.includes("/summary")) return createSummaryResponse();
   if (call.url.endsWith("/verifications")) {
@@ -455,18 +684,23 @@ function responseFor(call: FetchCall): unknown {
     return { issue };
   }
   if (call.url.endsWith(`/issues/${issueId}`)) {
-    return call.method === "GET" ? createDetailResponse() : { issue };
+    return call.method === "GET"
+      ? createDetailResponse(issueOverrides)
+      : { issue };
   }
   if (call.url.includes("/api/issues?")) return { issues: [issue] };
   return { issue, titlingState: "ready" };
 }
 
-function createIssueRecord() {
+function createIssueRecord(overrides: Record<string, unknown> = {}) {
   return {
     id: issueId,
     githubRepositoryId: repositoryId,
     title: "Checkout failure",
     description: "Production checkout fails.",
+    type: "task",
+    priority: null,
+    severity: null,
     state: "open",
     resolutionDisposition: null,
     resolutionNote: null,
@@ -485,6 +719,7 @@ function createIssueRecord() {
       serializedBodyBytesLimit: 2_000_000,
       acceptingComments: true,
     },
+    ...overrides,
   };
 }
 
@@ -551,9 +786,9 @@ function createGitHubCommand() {
   };
 }
 
-function createDetailResponse() {
+function createDetailResponse(overrides: Record<string, unknown> = {}) {
   return {
-    issue: createIssueRecord(),
+    issue: createIssueRecord(overrides),
     events: [
       {
         id: resolutionEventId,

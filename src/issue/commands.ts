@@ -45,6 +45,7 @@ import {
   resolveAuthenticatedIssueApiRuntime,
   type IssueRuntime,
 } from "./runtime.js";
+import type { IssuePriority, IssueSeverity, IssueType } from "./types.js";
 
 interface JsonOption {
   json?: boolean;
@@ -62,7 +63,13 @@ export type CommentIssueCommandOptions = Omit<
 > &
   JsonOption;
 export type ShowIssueCommandOptions = { issueId: string } & JsonOption;
-export type UpdateIssueCommandOptions = UpdateIssueRequest & JsonOption;
+export type UpdateIssueCommandOptions = Omit<
+  UpdateIssueRequest,
+  "categorization"
+> & {
+  type?: IssueType;
+  priority?: IssuePriority | null;
+} & JsonOption;
 export type ResolveIssueCommandOptions = ResolveIssueRequest & JsonOption;
 export type ReopenIssueCommandOptions = {
   issueId: string;
@@ -157,12 +164,48 @@ export async function updateIssueCommand(
   options: UpdateIssueCommandOptions,
 ): Promise<void> {
   await runIssueOperation("update issue", runtime, async (apiRuntime) => {
+    const apiOptions = issueApiRuntime(apiRuntime);
+    const categorization =
+      options.type === undefined && options.priority === undefined
+        ? undefined
+        : mergeIssueCategorization(
+            (
+              await getIssue({
+                ...apiOptions,
+                issueId: options.issueId,
+              })
+            ).issue,
+            options,
+          );
     const result = await updateIssue({
-      ...issueApiRuntime(apiRuntime),
-      ...options,
+      ...apiOptions,
+      issueId: options.issueId,
+      version: options.version,
+      ...(options.title == null ? {} : { title: options.title }),
+      ...(options.description == null
+        ? {}
+        : { description: options.description }),
+      ...(categorization == null ? {} : { categorization }),
     });
     printUpdatedIssue(runtime.stdout, result, "updated", options.json === true);
   });
+}
+
+function mergeIssueCategorization(
+  current: {
+    type: IssueType;
+    priority: IssuePriority | null;
+    severity: IssueSeverity | null;
+  },
+  update: Pick<UpdateIssueCommandOptions, "type" | "priority">,
+) {
+  const type = update.type ?? current.type;
+  return {
+    type,
+    priority:
+      update.priority === undefined ? current.priority : update.priority,
+    severity: type === "bug" ? current.severity : null,
+  };
 }
 
 export async function resolveIssueCommand(

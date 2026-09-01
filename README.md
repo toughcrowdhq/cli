@@ -244,7 +244,8 @@ Capture and inspect Tough Crowd issues with the singular `issue` namespace:
 
 ```sh
 toughcrowd issue new "Production checkout fails for saved cards" \
-  --repository-id 22222222-2222-4222-8222-222222222222
+  --repository-id 22222222-2222-4222-8222-222222222222 \
+  --type bug --priority high
 toughcrowd issue list --state open
 toughcrowd issue show <issue-id>
 toughcrowd issue comment <issue-id> "The failure reproduces when the saved card has expired."
@@ -257,11 +258,19 @@ Issue updates use optimistic concurrency. Pass the current value shown by
 
 ```sh
 toughcrowd issue update <issue-id> --issue-version 3 --title "Checkout retry failure"
-toughcrowd issue resolve <issue-id> --issue-version 4 --disposition fixed
-toughcrowd issue reopen <issue-id> --issue-version 5
-toughcrowd issue verify <issue-id> --issue-version 5 \
+toughcrowd issue update <issue-id> --issue-version 4 --type bug --priority high
+toughcrowd issue update <issue-id> --issue-version 5 --priority none
+toughcrowd issue resolve <issue-id> --issue-version 6 --disposition fixed
+toughcrowd issue reopen <issue-id> --issue-version 7
+toughcrowd issue verify <issue-id> --issue-version 7 \
   --result passed --environment production
 ```
+
+Issue types are `bug`, `feature`, or `task`. Priorities are `urgent`, `high`,
+`medium`, or `low`. Both flags work with `issue new` and `issue update`; pass
+`--priority none` to create an issue without a priority or clear the current
+priority. When only one update categorization flag is supplied, the CLI
+preserves the issue's other categorization values.
 
 Link delivery work and optional GitHub issue synchronization explicitly:
 

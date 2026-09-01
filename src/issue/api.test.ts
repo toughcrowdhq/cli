@@ -56,6 +56,8 @@ describe("issue API", () => {
       repositoryId,
       description: "Production checkout fails.",
       title: "Checkout failure",
+      type: "bug",
+      priority: "high",
       mirrorToGitHub: true,
       idempotencyKey: "issue-key",
     });
@@ -65,6 +67,11 @@ describe("issue API", () => {
       issueId,
       version: 1,
       title: "Updated title",
+      categorization: {
+        type: "bug",
+        priority: "high",
+        severity: "critical",
+      },
     });
     await resolveIssue({
       ...runtime,
@@ -104,9 +111,19 @@ describe("issue API", () => {
       repositoryId,
       description: "Production checkout fails.",
       title: "Checkout failure",
+      type: "bug",
+      priority: "high",
       mirrorToGitHub: true,
     });
-    expect(fetch.calls[3].body).toEqual({ version: 1, title: "Updated title" });
+    expect(fetch.calls[3].body).toEqual({
+      version: 1,
+      title: "Updated title",
+      categorization: {
+        type: "bug",
+        priority: "high",
+        severity: "critical",
+      },
+    });
     expect(fetch.calls[4].body).toEqual({
       version: 2,
       disposition: "fixed",
@@ -264,6 +281,9 @@ function createIssueRecord(overrides: Record<string, unknown> = {}) {
     githubRepositoryId: repositoryId,
     title: "Checkout failure",
     description: "Production checkout fails.",
+    type: "task",
+    priority: null,
+    severity: null,
     state: "open",
     resolutionDisposition: null,
     resolutionNote: null,

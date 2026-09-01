@@ -328,10 +328,10 @@ command family follows the server's optimistic-concurrency contract:
 
 ```text
 toughcrowd issue list
-toughcrowd issue new <description> --repository-id <repository-id>
+toughcrowd issue new <description> --repository-id <repository-id> [--type <type>] [--priority <priority|none>]
 toughcrowd issue show <issue-id>
 toughcrowd issue comment <issue-id> <body> [--session-id <session-id>]
-toughcrowd issue update <issue-id> --issue-version <version>
+toughcrowd issue update <issue-id> --issue-version <version> [--title <title>] [--description <description>] [--type <type>] [--priority <priority|none>]
 toughcrowd issue resolve <issue-id> --issue-version <version> --disposition <disposition>
 toughcrowd issue reopen <issue-id> --issue-version <version>
 toughcrowd issue verify <issue-id> --issue-version <version> --result <result> --environment <name>

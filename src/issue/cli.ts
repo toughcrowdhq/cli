@@ -20,12 +20,16 @@ import {
 } from "./commands.js";
 import {
   issueDispositions,
+  issuePriorities,
   issueRelationshipRoles,
   issueStates,
+  issueTypes,
   issueVerificationResults,
   type IssueDisposition,
+  type IssuePriority,
   type IssueRelationshipRole,
   type IssueState,
+  type IssueType,
   type IssueVerificationResult,
 } from "./types.js";
 
@@ -100,6 +104,15 @@ function createNewCommand(runtime: CreateIssueRuntime): Command {
     .argument("<description>", "issue description")
     .requiredOption("--repository-id <id>", "repository ID")
     .option("--title <title>", "issue title")
+    .addOption(
+      new Option("--type <type>", "issue type").choices([...issueTypes]),
+    )
+    .addOption(
+      new Option("--priority <priority>", "issue priority").choices([
+        ...issuePriorities,
+        "none",
+      ]),
+    )
     .option("--mirror-github", "also request a linked GitHub issue")
     .option("--json", "print machine-readable JSON")
     .action(
@@ -108,6 +121,8 @@ function createNewCommand(runtime: CreateIssueRuntime): Command {
         options: {
           repositoryId: string;
           title?: string;
+          type?: IssueType;
+          priority?: IssuePriority | "none";
           mirrorGithub?: boolean;
           json?: boolean;
         },
@@ -116,6 +131,8 @@ function createNewCommand(runtime: CreateIssueRuntime): Command {
           repositoryId: options.repositoryId,
           description,
           title: options.title,
+          type: options.type,
+          priority: options.priority === "none" ? null : options.priority,
           mirrorToGitHub: options.mirrorGithub === true,
           json: options.json === true,
         });
@@ -142,6 +159,15 @@ function createUpdateCommand(runtime: CreateIssueRuntime): Command {
     )
     .option("--title <title>", "new issue title")
     .option("--description <description>", "new issue description")
+    .addOption(
+      new Option("--type <type>", "new issue type").choices([...issueTypes]),
+    )
+    .addOption(
+      new Option("--priority <priority>", "new issue priority").choices([
+        ...issuePriorities,
+        "none",
+      ]),
+    )
     .option("--json", "print machine-readable JSON")
     .action(
       async (
@@ -150,12 +176,19 @@ function createUpdateCommand(runtime: CreateIssueRuntime): Command {
           issueVersion: number;
           title?: string;
           description?: string;
+          type?: IssueType;
+          priority?: IssuePriority | "none";
           json?: boolean;
         },
       ) => {
-        if (options.title == null && options.description == null) {
+        if (
+          options.title == null &&
+          options.description == null &&
+          options.type == null &&
+          options.priority == null
+        ) {
           updateCommand.error(
-            "error: at least one of --title or --description is required",
+            "error: at least one of --title, --description, --type, or --priority is required",
           );
         }
         await updateIssueCommand(runtime, {
@@ -163,6 +196,8 @@ function createUpdateCommand(runtime: CreateIssueRuntime): Command {
           version: options.issueVersion,
           title: options.title,
           description: options.description,
+          type: options.type,
+          priority: options.priority === "none" ? null : options.priority,
           json: options.json === true,
         });
       },

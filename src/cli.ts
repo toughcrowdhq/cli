@@ -254,7 +254,9 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
     .action(
       async (
         prompt: string,
-        options: Omit<CreateSessionCommandOptions, "prompt">,
+        options: Omit<CreateSessionCommandOptions, "prompt" | "noDefaults"> & {
+          defaults?: boolean;
+        },
       ) => {
         await create(
           {
@@ -274,7 +276,7 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
             profile: options.profile,
             model: options.model,
             reasoningEffort: options.reasoningEffort,
-            noDefaults: options.noDefaults,
+            noDefaults: options.defaults === false,
             baseBranch: options.baseBranch,
             title: options.title,
             issueId: options.issueId,

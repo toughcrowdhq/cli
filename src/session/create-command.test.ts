@@ -168,6 +168,40 @@ describe("session new command", () => {
     expect(runtime.stderr.output).toBe("");
   });
 
+  it("bypasses environment session-selection defaults with --no-defaults", async () => {
+    const fetch = createFetch(() =>
+      jsonResponse(createSessionResponse({ title: null }), 201),
+    );
+    const runtime = createRuntime({
+      env: {
+        TOUGHCROWD_API_KEY: "tc_secret",
+        TOUGHCROWD_AGENT_PROFILE: "codex-cli-default",
+        TOUGHCROWD_MODEL: "gpt-5.6-sol",
+        TOUGHCROWD_REASONING_EFFORT: "high",
+      },
+      fetch,
+    });
+
+    const exitCode = await runCli(
+      [
+        "session",
+        "new",
+        "Fix checkout",
+        "--repo",
+        "acme/web",
+        "--no-defaults",
+        "--json",
+      ],
+      runtime,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(fetch.calls[0].body).toBe(
+      JSON.stringify({ prompt: "Fix checkout", repository: "acme/web" }),
+    );
+    expect(runtime.stderr.output).toBe("");
+  });
+
   it("relates a new session to an issue", async () => {
     const fetch = createFetch(() =>
       jsonResponse(createSessionResponse({ title: null }), 201),

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { CredentialStore } from "../auth/credentials.js";
 import { runCli, type CliRuntime } from "../cli.js";
 
@@ -23,6 +25,11 @@ const sessionNewHelp =
     "  --json                       print machine-readable JSON",
     "  -h, --help                   display help for command",
   ].join("\n") + "\n";
+
+const isolatedConfigPath = join(
+  tmpdir(),
+  "toughcrowd-create-command-test-config.json",
+);
 
 describe("session new command", () => {
   it("prints literal help", async () => {
@@ -637,7 +644,10 @@ function createRuntime(
     stderr: createWritable(),
     version: overrides.version ?? "0.2.0-test",
     signal: overrides.signal ?? new AbortController().signal,
-    env: overrides.env,
+    env: {
+      TOUGHCROWD_CONFIG: isolatedConfigPath,
+      ...overrides.env,
+    },
     credentialStore:
       overrides.credentialStore ?? createMemoryCredentialStore({}),
     fetch: overrides.fetch,

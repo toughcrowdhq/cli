@@ -3,7 +3,8 @@
 The public command-line client for Tough Crowd, which supervises coding-agent
 work in cloud sandboxes and helps people decide what is safe to ship.
 
-The CLI provides API-key authentication plus session and issue workflows.
+The CLI provides API-key authentication plus session, issue, incident, and
+deployment workflows.
 
 ## Install
 
@@ -65,6 +66,7 @@ Commands:
   agent-profile   Discover executable Agent Profiles
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
+  incident        Work with Tough Crowd incidents
   deploy          Report Tough Crowd deployments
   help [command]  display help for command
 ```
@@ -281,6 +283,46 @@ projected to documented client-facing fields before they are printed.
 Issue comments are append-only. Add an optional associated session with
 `--session-id`; all comments and their current capacity are visible through
 `issue show`.
+
+## Incidents
+
+Use the Incident Repository workflow for externally observed incidents:
+
+```sh
+toughcrowd incident create "Checkout API is returning 503s" \
+  --title "Checkout outage" --repo acme/web --severity p1
+toughcrowd incident list --state active --severity p1 --repo acme/web
+toughcrowd incident get <incident-id> --limit 25
+toughcrowd incident update <incident-id> \
+  --state resolved --resolution-summary "Rolled back the bad deployment"
+toughcrowd incident update <incident-id> --state active
+toughcrowd incident note <incident-id> "First customer report arrived at 20:03Z."
+toughcrowd incident note update <incident-id> <note-id> "Corrected timestamp."
+```
+
+`incident create` resolves the repository from `--repo`, then
+`TOUGHCROWD_REPO`, then a recognizable GitHub HTTPS or SSH `origin` remote.
+`incident list --repo` is only an explicit exact filter and does not infer from
+the environment or Git. `incident update` changes repository only when `--repo`
+is passed.
+
+Severity values are `p0`, `p1`, `p2`, `p3`, and `unclassified`. State values
+are `active` and `resolved`. Resolve and reopen incidents with
+`incident update`; there are no separate resolve or reopen commands.
+
+Every incident operation accepts `--json`. Human output strips terminal control
+characters and prints lifecycle state, severity, resolution, timestamps,
+attribution, and note bodies as server-provided incident content. `incident get`
+combines the current incident detail with one bounded chronological notes page
+and prints `nextCursor` when more notes are available. Pass `--limit <count>`
+from 1 to 100 and return opaque cursors unchanged with `--cursor`.
+
+Incident and note updates are last-write-wins. The CLI does not accept expected
+version flags, create incident-specific idempotency keys, retry POST requests,
+cache disabled-feature decisions, store local incident data, retain note
+revisions, poll, schedule work, add memory commands, or connect incidents to
+sessions. If a create or note POST returns an ambiguous network or timeout
+failure, read the incident or note state before retrying.
 
 ## Deployments
 

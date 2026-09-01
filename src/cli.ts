@@ -27,6 +27,8 @@ import { createDeployCommandGroup } from "./deploy/cli.js";
 import { DeployCommandError } from "./deploy/errors.js";
 import { createIssueCommandGroup } from "./issue/cli.js";
 import { IssueCommandError } from "./issue/errors.js";
+import { createIncidentCommandGroup } from "./incident/cli.js";
+import { IncidentCommandError } from "./incident/errors.js";
 import { create, type CreateSessionCommandOptions } from "./session/create.js";
 import { list, type ListSessionCommandOptions } from "./session/list.js";
 import { SessionCommandError } from "./session/errors.js";
@@ -119,6 +121,11 @@ export async function runCli(
       return error.exitCode;
     }
 
+    if (error instanceof IncidentCommandError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     if (error instanceof DeployCommandError) {
       runtime.stderr.write(`${error.message}\n`);
       return error.exitCode;
@@ -183,6 +190,19 @@ function createRootProgram(runtime: CliRuntime): Command {
           runtime.createIdempotencyKey != null
             ? runtime.createIdempotencyKey()
             : randomUUID(),
+      }),
+      runtime,
+    ),
+  );
+
+  program.addCommand(
+    configureCommandTree(
+      createIncidentCommandGroup({
+        ...createSessionRuntime(runtime),
+        readGitOrigin: () =>
+          runtime.readGitOrigin != null
+            ? runtime.readGitOrigin()
+            : readGitOriginUrl({ signal: runtime.signal }),
       }),
       runtime,
     ),

@@ -2,6 +2,8 @@ import { ApiClientError } from "../api/errors.js";
 import { apiKeyEnvironmentVariable } from "../auth/credentials.js";
 import { AuthCommandError } from "../auth/errors.js";
 import { createSession } from "./api.js";
+import { ConfigError, readConfig } from "../config.js";
+import { listAgentProfiles, validateSelection } from "../agent-profile.js";
 import { SessionCommandError } from "./errors.js";
 import {
   resolveCreateSessionInputs,
@@ -23,6 +25,9 @@ export interface CreateSessionCommandOptions {
   prompt: string;
   repo?: string;
   profile?: string;
+  model?: string;
+  reasoningEffort?: string;
+  noDefaults?: boolean;
   baseBranch?: string;
   title?: string;
   issueId?: string;
@@ -34,16 +39,46 @@ export async function create(
   options: CreateSessionCommandOptions,
 ): Promise<void> {
   try {
+    const config =
+      options.noDefaults === true ? undefined : await readConfig(runtime.env);
     const inputs = await resolveCreateSessionInputs({
       prompt: options.prompt,
       repo: options.repo,
       profile: options.profile,
+      model: options.model,
+      reasoningEffort: options.reasoningEffort,
+      config: config?.session,
+      noDefaults: options.noDefaults,
       baseBranch: options.baseBranch,
       title: options.title,
       env: runtime.env,
       readGitOrigin: () => runtime.readGitOrigin(),
     });
     const apiRuntime = await resolveAuthenticatedSessionApiRuntime(runtime);
+    if (
+      inputs.agentProfile?.source === "configuration" ||
+      inputs.model?.source === "configuration" ||
+      inputs.reasoningEffort?.source === "configuration"
+    ) {
+      try {
+        validateSelection(await listAgentProfiles(apiRuntime), {
+          profile: inputs.agentProfile?.value,
+          model: inputs.model?.value,
+          reasoningEffort: inputs.reasoningEffort?.value,
+        });
+      } catch (error) {
+        if (error instanceof ApiClientError) {
+          throw error;
+        }
+        const message =
+          error instanceof Error
+            ? error.message
+            : "configured session selection is invalid.";
+        throw new SessionCommandError(
+          `${message} It came from machine-local configuration; use an explicit flag or \`toughcrowd config unset\` to change it.`,
+        );
+      }
+    }
     const idempotencyKey = readIdempotencyKey(runtime.createIdempotencyKey());
     const result = await createSession({
       ...apiRuntime,
@@ -51,6 +86,8 @@ export async function create(
       prompt: inputs.prompt,
       repository: inputs.repository.value,
       agentProfile: inputs.agentProfile?.value,
+      model: inputs.model?.value,
+      reasoningEffort: inputs.reasoningEffort?.value,
       baseBranch: inputs.baseBranch,
       title: inputs.title,
       issueId: options.issueId,
@@ -79,7 +116,8 @@ function readIdempotencyKey(value: string): string {
 function formatCreateFailure(error: unknown): Error {
   if (
     error instanceof SessionCommandError ||
-    error instanceof AuthCommandError
+    error instanceof AuthCommandError ||
+    error instanceof ConfigError
   ) {
     return error;
   }

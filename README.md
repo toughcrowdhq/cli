@@ -3,7 +3,8 @@
 The public command-line client for Tough Crowd, which supervises coding-agent
 work in cloud sandboxes and helps people decide what is safe to ship.
 
-The CLI provides API-key authentication plus session and issue workflows.
+The CLI provides API-key authentication plus session, issue, incident, and
+deployment workflows.
 
 ## Install
 
@@ -61,8 +62,11 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  config          Manage machine-local Tough Crowd preferences
+  agent-profile   Discover executable Agent Profiles
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
+  incident        Work with Tough Crowd incidents
   deploy          Report Tough Crowd deployments
   help [command]  display help for command
 ```
@@ -120,8 +124,10 @@ toughcrowd session new "Fix the flaky checkout test" \
 
 Repository resolution uses `--repo`, then `TOUGHCROWD_REPO`, then a
 recognizable GitHub HTTPS or SSH `origin` remote in the current checkout.
-Agent Profile overrides use `--profile`, then `TOUGHCROWD_AGENT_PROFILE`.
-Without an override, the server selects Codex with GPT-5.5 when the signed-in
+Session selection resolves independently for Agent Profile, model, and reasoning
+effort: an explicit flag wins over an environment variable, which wins over
+machine-local configuration; omitted fields retain the existing server or
+selected-profile default. Without an Agent Profile override, the server selects Codex with GPT-5.5 when the signed-in
 user has an OpenAI key, otherwise Claude with Opus 4.8 when they have an
 Anthropic key.
 If neither provider key is configured, creation fails with guidance.
@@ -135,6 +141,50 @@ TOUGHCROWD_REPO=toughcrowdhq/app \
 TOUGHCROWD_AGENT_PROFILE=codex-cli-default \
 toughcrowd session new "Fix the flaky checkout test" --json
 ```
+
+Choose a model or reasoning effort for one session with `--model` and
+`--reasoning-effort`:
+
+```sh
+toughcrowd session new "Fix the flaky checkout test" --repo toughcrowdhq/app \
+  --profile codex-cli-chatgpt --model gpt-5.6-sol --reasoning-effort high
+```
+
+Use `--no-defaults` to bypass `TOUGHCROWD_AGENT_PROFILE`, `TOUGHCROWD_MODEL`,
+`TOUGHCROWD_REASONING_EFFORT`, and stored session preferences and request the
+server/profile defaults. It cannot be combined with `--profile`, `--model`, or
+`--reasoning-effort`.
+
+## Machine-local session defaults
+
+Store non-secret defaults for the current machine with:
+
+```sh
+toughcrowd agent-profile list
+toughcrowd config set session.profile codex-cli-chatgpt
+toughcrowd config set session.model gpt-5.6-sol
+toughcrowd config set session.reasoning-effort high
+toughcrowd config list
+```
+
+`agent-profile list --json` prints the executable profile catalog, including
+profile IDs, supported models, profile defaults, authentication modes, and
+supported reasoning efforts. `config set` checks selected combinations against
+that authenticated catalog. Use `toughcrowd config unset <key>` to remove a
+preference and `toughcrowd config path` to print its effective path. A stale
+stored selection fails session creation with guidance instead of silently
+falling back to another profile.
+
+The versioned JSON file contains only these non-secret preferences—never API
+keys or credentials. Its normal location is:
+
+- macOS: `~/Library/Application Support/toughcrowd/config.json`
+- Linux: `$XDG_CONFIG_HOME/toughcrowd/config.json`, or
+  `~/.config/toughcrowd/config.json`
+- Windows: `%APPDATA%\toughcrowd\config.json`
+
+Set `TOUGHCROWD_CONFIG` to use an explicit file path. Config updates create
+parent directories and are written atomically.
 
 To associate new coding-agent work with a Tough Crowd issue before it is
 queued, pass that issue's full ID:
@@ -233,6 +283,46 @@ projected to documented client-facing fields before they are printed.
 Issue comments are append-only. Add an optional associated session with
 `--session-id`; all comments and their current capacity are visible through
 `issue show`.
+
+## Incidents
+
+Use the Incident Repository workflow for externally observed incidents:
+
+```sh
+toughcrowd incident create "Checkout API is returning 503s" \
+  --title "Checkout outage" --repo acme/web --severity p1
+toughcrowd incident list --state active --severity p1 --repo acme/web
+toughcrowd incident get <incident-id> --limit 25
+toughcrowd incident update <incident-id> \
+  --state resolved --resolution-summary "Rolled back the bad deployment"
+toughcrowd incident update <incident-id> --state active
+toughcrowd incident note <incident-id> "First customer report arrived at 20:03Z."
+toughcrowd incident note update <incident-id> <note-id> "Corrected timestamp."
+```
+
+`incident create` resolves the repository from `--repo`, then
+`TOUGHCROWD_REPO`, then a recognizable GitHub HTTPS or SSH `origin` remote.
+`incident list --repo` is only an explicit exact filter and does not infer from
+the environment or Git. `incident update` changes repository only when `--repo`
+is passed.
+
+Severity values are `p0`, `p1`, `p2`, `p3`, and `unclassified`. State values
+are `active` and `resolved`. Resolve and reopen incidents with
+`incident update`; there are no separate resolve or reopen commands.
+
+Every incident operation accepts `--json`. Human output strips terminal control
+characters and prints lifecycle state, severity, resolution, timestamps,
+attribution, and note bodies as server-provided incident content. `incident get`
+combines the current incident detail with one bounded chronological notes page
+and prints `nextCursor` when more notes are available. Pass `--limit <count>`
+from 1 to 100 and return opaque cursors unchanged with `--cursor`.
+
+Incident and note updates are last-write-wins. The CLI does not accept expected
+version flags, create incident-specific idempotency keys, retry POST requests,
+cache disabled-feature decisions, store local incident data, retain note
+revisions, poll, schedule work, add memory commands, or connect incidents to
+sessions. If a create or note POST returns an ambiguous network or timeout
+failure, read the incident or note state before retrying.
 
 ## Deployments
 

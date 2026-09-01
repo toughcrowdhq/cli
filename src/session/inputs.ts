@@ -2,18 +2,27 @@ import { SessionCommandError } from "./errors.js";
 
 export const repositoryEnvironmentVariable = "TOUGHCROWD_REPO";
 export const agentProfileEnvironmentVariable = "TOUGHCROWD_AGENT_PROFILE";
+export const modelEnvironmentVariable = "TOUGHCROWD_MODEL";
+export const reasoningEffortEnvironmentVariable = "TOUGHCROWD_REASONING_EFFORT";
 
-export type CreationInputSource = "environment" | "flag" | "git-origin";
+export type CreationInputSource =
+  "environment" | "flag" | "configuration" | "git-origin";
 
 export interface CreationEnvironment {
   readonly [repositoryEnvironmentVariable]?: string;
   readonly [agentProfileEnvironmentVariable]?: string;
+  readonly [modelEnvironmentVariable]?: string;
+  readonly [reasoningEffortEnvironmentVariable]?: string;
 }
 
 export interface CreateSessionInputOptions {
   prompt: string;
   repo?: string;
   profile?: string;
+  model?: string;
+  reasoningEffort?: string;
+  config?: { agentProfile?: string; model?: string; reasoningEffort?: string };
+  noDefaults?: boolean;
   baseBranch?: string;
   title?: string;
   env?: CreationEnvironment;
@@ -27,6 +36,11 @@ export interface ResolvedCreateSessionInputs {
     source: CreationInputSource;
   };
   agentProfile?: {
+    value: string;
+    source: Exclude<CreationInputSource, "git-origin">;
+  };
+  model?: { value: string; source: Exclude<CreationInputSource, "git-origin"> };
+  reasoningEffort?: {
     value: string;
     source: Exclude<CreationInputSource, "git-origin">;
   };
@@ -57,12 +71,32 @@ export async function resolveCreateSessionInputs(
   );
   const title = readOptionalText(options.title, "Title", maximumTitleLength);
   const agentProfile = resolveAgentProfile(options);
+  const model = resolveSelection(
+    options.model,
+    options.noDefaults ? undefined : options.env?.[modelEnvironmentVariable],
+    options.noDefaults ? undefined : options.config?.model,
+    "Model",
+    "--model",
+    modelEnvironmentVariable,
+  );
+  const reasoningEffort = resolveSelection(
+    options.reasoningEffort,
+    options.noDefaults
+      ? undefined
+      : options.env?.[reasoningEffortEnvironmentVariable],
+    options.noDefaults ? undefined : options.config?.reasoningEffort,
+    "Reasoning effort",
+    "--reasoning-effort",
+    reasoningEffortEnvironmentVariable,
+  );
   const repository = await resolveRepository(options);
 
   return {
     prompt,
     repository,
     ...(agentProfile != null ? { agentProfile } : {}),
+    ...(model != null ? { model } : {}),
+    ...(reasoningEffort != null ? { reasoningEffort } : {}),
     ...(baseBranch != null ? { baseBranch } : {}),
     ...(title != null ? { title } : {}),
   };
@@ -120,7 +154,9 @@ function resolveAgentProfile(
     };
   }
 
-  const environmentProfile = options.env?.[agentProfileEnvironmentVariable];
+  const environmentProfile = options.noDefaults
+    ? undefined
+    : options.env?.[agentProfileEnvironmentVariable];
   if (environmentProfile != null && environmentProfile.trim().length > 0) {
     return {
       value: readAgentProfile(
@@ -131,7 +167,62 @@ function resolveAgentProfile(
     };
   }
 
+  if (options.noDefaults !== true && options.config?.agentProfile != null) {
+    return {
+      value: readAgentProfile(
+        options.config.agentProfile,
+        "configuration session.profile",
+      ),
+      source: "configuration",
+    };
+  }
+
   return undefined;
+}
+
+function resolveSelection(
+  flag: string | undefined,
+  environment: string | undefined,
+  configured: string | undefined,
+  label: string,
+  flagName: string,
+  environmentName: string,
+): ResolvedCreateSessionInputs["model"] {
+  if (flag != null) {
+    return {
+      value: readGenericSelection(flag, flagName, label),
+      source: "flag",
+    };
+  }
+  if (environment != null && environment.trim().length > 0) {
+    return {
+      value: readGenericSelection(environment, environmentName, label),
+      source: "environment",
+    };
+  }
+  if (configured != null) {
+    return {
+      value: readGenericSelection(
+        configured,
+        `configuration session.${label === "Model" ? "model" : "reasoning-effort"}`,
+        label,
+      ),
+      source: "configuration",
+    };
+  }
+  return undefined;
+}
+
+function readGenericSelection(
+  value: string,
+  source: string,
+  label: string,
+): string {
+  const selection = value.trim();
+  if (selection.length === 0 || selection.length > 200) {
+    throw new SessionCommandError(`${label} from ${source} is invalid.`);
+  }
+  return selection;
 }
 
 async function resolveRepository(

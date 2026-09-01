@@ -5,6 +5,7 @@ import {
   Option,
 } from "commander";
 import { randomUUID } from "node:crypto";
+import { ApiClientError } from "./api/errors.js";
 import { openUrl as defaultOpenUrl } from "./browser.js";
 import { login, status, type AuthRuntime } from "./auth/commands.js";
 import type { FetchLike, TimerCapabilities } from "./api/request.js";
@@ -26,12 +27,29 @@ import { createDeployCommandGroup } from "./deploy/cli.js";
 import { DeployCommandError } from "./deploy/errors.js";
 import { createIssueCommandGroup } from "./issue/cli.js";
 import { IssueCommandError } from "./issue/errors.js";
+import { createIncidentCommandGroup } from "./incident/cli.js";
+import { IncidentCommandError } from "./incident/errors.js";
 import { create, type CreateSessionCommandOptions } from "./session/create.js";
 import { list, type ListSessionCommandOptions } from "./session/list.js";
 import { SessionCommandError } from "./session/errors.js";
 import { end } from "./session/end.js";
 import { isSessionId, sessionStatusFilters } from "./session/types.js";
-import type { SessionRuntime } from "./session/runtime.js";
+import {
+  resolveAuthenticatedSessionApiRuntime,
+  type SessionRuntime,
+} from "./session/runtime.js";
+import {
+  ConfigError,
+  configPath,
+  getConfigValue,
+  parseConfigKey,
+  readConfig,
+  setConfigValue,
+  unsetConfigValue,
+  writeConfig,
+  type ConfigKey,
+} from "./config.js";
+import { listAgentProfiles, validateSelection } from "./agent-profile.js";
 
 export interface CliWritable {
   write(value: string): unknown;
@@ -103,9 +121,19 @@ export async function runCli(
       return error.exitCode;
     }
 
+    if (error instanceof IncidentCommandError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     if (error instanceof DeployCommandError) {
       runtime.stderr.write(`${error.message}\n`);
       return error.exitCode;
+    }
+
+    if (error instanceof ConfigError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return 1;
     }
 
     runtime.stderr.write(`${formatUnexpectedError(error)}\n`);
@@ -143,6 +171,9 @@ function createRootProgram(runtime: CliRuntime): Command {
     .addCommand(createAuthLoginCommand(runtime))
     .addCommand(createAuthStatusCommand(runtime));
 
+  program.addCommand(createConfigCommand(runtime));
+  program.addCommand(createAgentProfileCommand(runtime));
+
   program
     .command("session")
     .description("Work with Tough Crowd sessions")
@@ -159,6 +190,19 @@ function createRootProgram(runtime: CliRuntime): Command {
           runtime.createIdempotencyKey != null
             ? runtime.createIdempotencyKey()
             : randomUUID(),
+      }),
+      runtime,
+    ),
+  );
+
+  program.addCommand(
+    configureCommandTree(
+      createIncidentCommandGroup({
+        ...createSessionRuntime(runtime),
+        readGitOrigin: () =>
+          runtime.readGitOrigin != null
+            ? runtime.readGitOrigin()
+            : readGitOriginUrl({ signal: runtime.signal }),
       }),
       runtime,
     ),
@@ -207,6 +251,17 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
     .argument("<prompt>", "initial instruction for the coding agent")
     .option("--repo <owner/name>", "repository for the session")
     .option("--profile <profile-id>", "Agent Profile to use")
+    .option("--model <model>", "model to use with the Agent Profile")
+    .option(
+      "--reasoning-effort <effort>",
+      "reasoning effort to use with the model",
+    )
+    .addOption(
+      new Option(
+        "--no-defaults",
+        "bypass environment and stored session defaults",
+      ).conflicts(["profile", "model", "reasoningEffort"]),
+    )
     .option("--base-branch <branch>", "base branch for generated changes")
     .option("--title <title>", "session title")
     .option(
@@ -220,7 +275,9 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
     .action(
       async (
         prompt: string,
-        options: Omit<CreateSessionCommandOptions, "prompt">,
+        options: Omit<CreateSessionCommandOptions, "prompt" | "noDefaults"> & {
+          defaults?: boolean;
+        },
       ) => {
         await create(
           {
@@ -238,6 +295,9 @@ function createSessionNewCommand(runtime: CliRuntime): Command {
             prompt,
             repo: options.repo,
             profile: options.profile,
+            model: options.model,
+            reasoningEffort: options.reasoningEffort,
+            noDefaults: options.defaults === false,
             baseBranch: options.baseBranch,
             title: options.title,
             issueId: options.issueId,
@@ -310,6 +370,196 @@ function createSessionRuntime(runtime: CliRuntime): SessionRuntime {
     timers: runtime.timers,
     credentialStore: runtime.credentialStore ?? createKeyringCredentialStore(),
   };
+}
+
+function createConfigCommand(runtime: CliRuntime): Command {
+  const command = new Command("config").description(
+    "Manage machine-local Tough Crowd preferences",
+  );
+  command.addCommand(
+    new Command("path")
+      .description("Print the effective configuration path")
+      .action(() => {
+        runtime.stdout.write(`${configPath(runtime.env)}\n`);
+      }),
+  );
+  command.addCommand(
+    new Command("list")
+      .description("List configured preferences")
+      .option("--json", "print machine-readable JSON")
+      .action(async (options: { json?: boolean }) => {
+        const config = await readConfig(runtime.env);
+        if (options.json === true) {
+          runtime.stdout.write(`${JSON.stringify(config)}\n`);
+          return;
+        }
+        for (const key of configKeys) {
+          const value = getConfigValue(config, key);
+          if (value != null) runtime.stdout.write(`${key}=${value}\n`);
+        }
+      }),
+  );
+  command.addCommand(
+    new Command("unset")
+      .description("Remove a configured preference")
+      .argument("<key>", "configuration key")
+      .action(async (key: string) => {
+        const config = unsetConfigValue(
+          await readConfig(runtime.env),
+          parseConfigKey(key),
+        );
+        await writeConfig(config, runtime.env);
+      }),
+  );
+  command.addCommand(
+    new Command("set")
+      .description("Set a machine-local session preference")
+      .argument("<key>", "configuration key")
+      .argument("<value>", "configuration value")
+      .action(async (key: string, value: string) => {
+        const configKey = parseConfigKey(key);
+        const config = setConfigValue(
+          await readConfig(runtime.env),
+          configKey,
+          value,
+        );
+        const apiRuntime = await resolveAuthenticatedSessionApiRuntime(
+          createSessionRuntime(runtime),
+        );
+        try {
+          const catalog = await listAgentProfiles(apiRuntime);
+          validateSelection(catalog, {
+            profile: config.session?.agentProfile,
+            model: config.session?.model,
+            reasoningEffort: config.session?.reasoningEffort,
+          });
+        } catch (error) {
+          throw new SessionCommandError(formatConfigSetFailure(error));
+        }
+        await writeConfig(config, runtime.env);
+      }),
+  );
+  return configureCommandTree(command, runtime);
+}
+
+export function formatConfigSetFailure(error: unknown): string {
+  if (error instanceof ApiClientError) {
+    if (error.kind === "canceled") {
+      return "Configuration update canceled.";
+    }
+    if (error.kind === "timeout") {
+      return "Could not set configuration: the API request timed out.";
+    }
+    if (error.kind === "network") {
+      return "Could not set configuration: could not reach the Tough Crowd API.";
+    }
+    if (error.kind === "malformed-response") {
+      return "Could not set configuration: the Tough Crowd API returned an invalid response.";
+    }
+    if (error.status != null && error.status >= 500) {
+      return "Could not set configuration: the Tough Crowd API returned an internal error.";
+    }
+    if (error.status === 401 || error.code === "authentication-required") {
+      return `Authentication failed: ${error.message} Run \`toughcrowd auth login\` or set TOUGHCROWD_API_KEY.`;
+    }
+    return `Could not set configuration: ${error.message}`;
+  }
+  if (error instanceof Error) {
+    return `Could not set configuration: ${error.message}`;
+  }
+  return "Could not set configuration: the Agent Profile catalog is invalid.";
+}
+
+const configKeys: readonly ConfigKey[] = [
+  "session.profile",
+  "session.model",
+  "session.reasoning-effort",
+];
+
+function createAgentProfileCommand(runtime: CliRuntime): Command {
+  const command = new Command("agent-profile").description(
+    "Discover executable Agent Profiles",
+  );
+  command.addCommand(
+    new Command("list")
+      .description("List available Agent Profiles")
+      .option("--json", "print machine-readable JSON")
+      .action(async (options: { json?: boolean }) => {
+        let profiles;
+        try {
+          profiles = await listAgentProfiles(
+            await resolveAuthenticatedSessionApiRuntime(
+              createSessionRuntime(runtime),
+            ),
+          );
+        } catch (error) {
+          if (error instanceof SessionCommandError) {
+            throw error;
+          }
+          throw formatAgentProfileListFailure(error);
+        }
+        if (options.json === true) {
+          runtime.stdout.write(`${JSON.stringify(profiles)}\n`);
+          return;
+        }
+        if (profiles.profiles.length === 0) {
+          runtime.stdout.write("No Agent Profiles found.\n");
+          return;
+        }
+        for (const profile of profiles.profiles) {
+          runtime.stdout.write(
+            `${profile.id}\t${profile.name}\t${profile.authenticationMode}\t${profile.defaultModel ?? "(server default)"}\n`,
+          );
+          for (const model of profile.models) {
+            runtime.stdout.write(
+              `  ${model.id}${model.reasoningEfforts.length === 0 ? "" : ` (${model.reasoningEfforts.join(", ")})`}\n`,
+            );
+          }
+        }
+      }),
+  );
+  return configureCommandTree(command, runtime);
+}
+
+export function formatAgentProfileListFailure(
+  error: unknown,
+): SessionCommandError {
+  if (error instanceof ApiClientError) {
+    if (error.kind === "canceled") {
+      return new SessionCommandError("Agent Profile listing canceled.", 130);
+    }
+    if (error.kind === "timeout") {
+      return new SessionCommandError(
+        "Could not list Agent Profiles: the API request timed out.",
+      );
+    }
+    if (error.kind === "network") {
+      return new SessionCommandError(
+        "Could not list Agent Profiles: could not reach the Tough Crowd API.",
+      );
+    }
+    if (
+      error.kind === "api" &&
+      (error.status === 401 || error.code === "authentication-required")
+    ) {
+      return new SessionCommandError(
+        `Authentication failed: ${error.message} Run \`toughcrowd auth login\` or set TOUGHCROWD_API_KEY.`,
+      );
+    }
+    if (error.status != null && error.status >= 500) {
+      return new SessionCommandError(
+        "Could not list Agent Profiles: the Tough Crowd API returned an internal error.",
+      );
+    }
+    if (error.kind === "api") {
+      return new SessionCommandError(
+        `Could not list Agent Profiles: ${error.message}`,
+      );
+    }
+  }
+  return new SessionCommandError(
+    "Could not list Agent Profiles: the Tough Crowd API returned an invalid response.",
+  );
 }
 
 function parseListLimit(value: string): number {

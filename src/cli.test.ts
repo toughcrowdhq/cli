@@ -30,6 +30,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
+  incident        Work with Tough Crowd incidents
   deploy          Report Tough Crowd deployments
   help [command]  display help for command
 `;

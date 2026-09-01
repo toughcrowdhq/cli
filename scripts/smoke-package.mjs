@@ -202,6 +202,8 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  config          Manage machine-local Tough Crowd preferences
+  agent-profile   Discover executable Agent Profiles
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
   deploy          Report Tough Crowd deployments
@@ -239,7 +241,7 @@ Commands:
         "Usage: toughcrowd session new [options] <prompt>\n",
       ) &&
       sessionNewHelpOutput.includes(
-        "  --profile <profile-id>  Agent Profile to use\n",
+        "  --profile <profile-id>       Agent Profile to use\n",
       ) &&
       sessionCancelHelpOutput.includes(
         "Usage: toughcrowd session cancel [options] <session-id>\n",

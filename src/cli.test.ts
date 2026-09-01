@@ -28,6 +28,8 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  config          Manage machine-local Tough Crowd preferences
+  agent-profile   Discover executable Agent Profiles
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
   deploy          Report Tough Crowd deployments

@@ -61,6 +61,8 @@ Options:
 
 Commands:
   auth            Manage Tough Crowd authentication
+  config          Manage machine-local Tough Crowd preferences
+  agent-profile   Discover executable Agent Profiles
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
   deploy          Report Tough Crowd deployments
@@ -120,8 +122,10 @@ toughcrowd session new "Fix the flaky checkout test" \
 
 Repository resolution uses `--repo`, then `TOUGHCROWD_REPO`, then a
 recognizable GitHub HTTPS or SSH `origin` remote in the current checkout.
-Agent Profile overrides use `--profile`, then `TOUGHCROWD_AGENT_PROFILE`.
-Without an override, the server selects Codex with GPT-5.5 when the signed-in
+Session selection resolves independently for Agent Profile, model, and reasoning
+effort: an explicit flag wins over an environment variable, which wins over
+machine-local configuration; omitted fields retain the existing server or
+selected-profile default. Without an Agent Profile override, the server selects Codex with GPT-5.5 when the signed-in
 user has an OpenAI key, otherwise Claude with Opus 4.8 when they have an
 Anthropic key.
 If neither provider key is configured, creation fails with guidance.
@@ -135,6 +139,50 @@ TOUGHCROWD_REPO=toughcrowdhq/app \
 TOUGHCROWD_AGENT_PROFILE=codex-cli-default \
 toughcrowd session new "Fix the flaky checkout test" --json
 ```
+
+Choose a model or reasoning effort for one session with `--model` and
+`--reasoning-effort`:
+
+```sh
+toughcrowd session new "Fix the flaky checkout test" --repo toughcrowdhq/app \
+  --profile codex-cli-chatgpt --model gpt-5.6-sol --reasoning-effort high
+```
+
+Use `--no-defaults` to bypass `TOUGHCROWD_AGENT_PROFILE`, `TOUGHCROWD_MODEL`,
+`TOUGHCROWD_REASONING_EFFORT`, and stored session preferences and request the
+server/profile defaults. It cannot be combined with `--profile`, `--model`, or
+`--reasoning-effort`.
+
+## Machine-local session defaults
+
+Store non-secret defaults for the current machine with:
+
+```sh
+toughcrowd agent-profile list
+toughcrowd config set session.profile codex-cli-chatgpt
+toughcrowd config set session.model gpt-5.6-sol
+toughcrowd config set session.reasoning-effort high
+toughcrowd config list
+```
+
+`agent-profile list --json` prints the executable profile catalog, including
+profile IDs, supported models, profile defaults, authentication modes, and
+supported reasoning efforts. `config set` checks selected combinations against
+that authenticated catalog. Use `toughcrowd config unset <key>` to remove a
+preference and `toughcrowd config path` to print its effective path. A stale
+stored selection fails session creation with guidance instead of silently
+falling back to another profile.
+
+The versioned JSON file contains only these non-secret preferences—never API
+keys or credentials. Its normal location is:
+
+- macOS: `~/Library/Application Support/toughcrowd/config.json`
+- Linux: `$XDG_CONFIG_HOME/toughcrowd/config.json`, or
+  `~/.config/toughcrowd/config.json`
+- Windows: `%APPDATA%\toughcrowd\config.json`
+
+Set `TOUGHCROWD_CONFIG` to use an explicit file path. Config updates create
+parent directories and are written atomically.
 
 To associate new coding-agent work with a Tough Crowd issue before it is
 queued, pass that issue's full ID:

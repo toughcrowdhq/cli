@@ -15,6 +15,8 @@ export interface CreateSessionRequest {
   prompt: string;
   repository: string;
   agentProfile?: string;
+  model?: string;
+  reasoningEffort?: string;
   baseBranch?: string;
   title?: string;
   issueId?: string;
@@ -44,6 +46,10 @@ export function createSession(
       repository: options.repository,
       ...(options.agentProfile != null
         ? { agentProfile: options.agentProfile }
+        : {}),
+      ...(options.model != null ? { model: options.model } : {}),
+      ...(options.reasoningEffort != null
+        ? { reasoningEffort: options.reasoningEffort }
         : {}),
       ...(options.baseBranch != null ? { baseBranch: options.baseBranch } : {}),
       ...(options.title != null ? { title: options.title } : {}),

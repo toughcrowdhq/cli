@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { CredentialStore } from "../auth/credentials.js";
 import { runCli, type CliRuntime } from "../cli.js";
 
@@ -9,17 +11,25 @@ const sessionNewHelp =
     "Create a new coding-agent session",
     "",
     "Arguments:",
-    "  prompt                  initial instruction for the coding agent",
+    "  prompt                       initial instruction for the coding agent",
     "",
     "Options:",
-    "  --repo <owner/name>     repository for the session",
-    "  --profile <profile-id>  Agent Profile to use",
-    "  --base-branch <branch>  base branch for generated changes",
-    "  --title <title>         session title",
-    "  --issue-id <issue-id>   relate the new session to an issue",
-    "  --json                  print machine-readable JSON",
-    "  -h, --help              display help for command",
+    "  --repo <owner/name>          repository for the session",
+    "  --profile <profile-id>       Agent Profile to use",
+    "  --model <model>              model to use with the Agent Profile",
+    "  --reasoning-effort <effort>  reasoning effort to use with the model",
+    "  --no-defaults                bypass environment and stored session defaults",
+    "  --base-branch <branch>       base branch for generated changes",
+    "  --title <title>              session title",
+    "  --issue-id <issue-id>        relate the new session to an issue",
+    "  --json                       print machine-readable JSON",
+    "  -h, --help                   display help for command",
   ].join("\n") + "\n";
+
+const isolatedConfigPath = join(
+  tmpdir(),
+  "toughcrowd-create-command-test-config.json",
+);
 
 describe("session new command", () => {
   it("prints literal help", async () => {
@@ -161,6 +171,40 @@ describe("session new command", () => {
         prompt: "Fix checkout",
         repository: "acme/web",
       }),
+    );
+    expect(runtime.stderr.output).toBe("");
+  });
+
+  it("bypasses environment session-selection defaults with --no-defaults", async () => {
+    const fetch = createFetch(() =>
+      jsonResponse(createSessionResponse({ title: null }), 201),
+    );
+    const runtime = createRuntime({
+      env: {
+        TOUGHCROWD_API_KEY: "tc_secret",
+        TOUGHCROWD_AGENT_PROFILE: "codex-cli-default",
+        TOUGHCROWD_MODEL: "gpt-5.6-sol",
+        TOUGHCROWD_REASONING_EFFORT: "high",
+      },
+      fetch,
+    });
+
+    const exitCode = await runCli(
+      [
+        "session",
+        "new",
+        "Fix checkout",
+        "--repo",
+        "acme/web",
+        "--no-defaults",
+        "--json",
+      ],
+      runtime,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(fetch.calls[0].body).toBe(
+      JSON.stringify({ prompt: "Fix checkout", repository: "acme/web" }),
     );
     expect(runtime.stderr.output).toBe("");
   });
@@ -600,7 +644,10 @@ function createRuntime(
     stderr: createWritable(),
     version: overrides.version ?? "0.2.0-test",
     signal: overrides.signal ?? new AbortController().signal,
-    env: overrides.env,
+    env: {
+      TOUGHCROWD_CONFIG: isolatedConfigPath,
+      ...overrides.env,
+    },
     credentialStore:
       overrides.credentialStore ?? createMemoryCredentialStore({}),
     fetch: overrides.fetch,

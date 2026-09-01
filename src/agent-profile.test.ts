@@ -27,6 +27,26 @@ const catalog: AgentProfileCatalog = {
 };
 
 describe("validateSelection", () => {
+  it("validates a model without an explicit profile across executable profiles", () => {
+    expect(() =>
+      validateSelection(catalog, { model: "gpt-5.6-sol" }),
+    ).not.toThrow();
+    expect(() => validateSelection(catalog, { model: "unavailable" })).toThrow(
+      "Model unavailable is not supported by any Agent Profile.",
+    );
+  });
+
+  it("validates a reasoning effort without an explicit profile against profile defaults", () => {
+    expect(() =>
+      validateSelection(catalog, { reasoningEffort: "high" }),
+    ).not.toThrow();
+    expect(() =>
+      validateSelection(catalog, { reasoningEffort: "xhigh" }),
+    ).toThrow(
+      "Reasoning effort xhigh is not supported by any compatible Agent Profile.",
+    );
+  });
+
   it("validates reasoning effort against a selected profile's default model", () => {
     expect(() =>
       validateSelection(catalog, {

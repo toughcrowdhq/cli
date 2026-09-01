@@ -93,37 +93,79 @@ export function validateSelection(
   catalog: AgentProfileCatalog,
   selection: { profile?: string; model?: string; reasoningEffort?: string },
 ): void {
-  if (selection.profile == null) return;
-  const profile = catalog.profiles.find(
-    (entry) => entry.id === selection.profile,
+  const profiles = selectProfiles(catalog, selection.profile);
+  if (selection.model == null && selection.reasoningEffort == null) return;
+  const candidates = profiles.flatMap((profile) => {
+    const modelId = selection.model ?? profile.defaultModel;
+    if (modelId == null) return [];
+    const model = profile.models.find((entry) => entry.id === modelId);
+    return model == null ? [] : [{ profile, model }];
+  });
+
+  if (candidates.length === 0) {
+    throwSelectionFailure(catalog, selection);
+  }
+
+  const reasoningEffort = selection.reasoningEffort;
+  if (reasoningEffort == null) return;
+  const supported = candidates.some(
+    ({ model }) =>
+      model.reasoningEfforts.length === 0 ||
+      model.reasoningEfforts.includes(reasoningEffort),
   );
-  if (profile == null) {
-    throw new Error(`Agent Profile ${selection.profile} is not available.`);
-  }
-  const modelId = selection.model ?? profile.defaultModel;
-  if (modelId == null) {
-    if (selection.reasoningEffort != null) {
-      throw new Error(
-        `Reasoning effort ${selection.reasoningEffort} requires a model for Agent Profile ${selection.profile}.`,
-      );
-    }
-    return;
-  }
-  const model = profile.models.find((entry) => entry.id === modelId);
-  if (model == null) {
-    throw new Error(
-      `Model ${modelId} is not supported by Agent Profile ${selection.profile}.`,
-    );
-  }
-  if (
-    selection.reasoningEffort != null &&
-    model.reasoningEfforts.length > 0 &&
-    !model.reasoningEfforts.includes(selection.reasoningEffort)
-  ) {
+  if (supported) return;
+
+  if (selection.profile != null) {
+    const modelId = selection.model ?? profiles[0].defaultModel;
     throw new Error(
       `Reasoning effort ${selection.reasoningEffort} is not supported by ${selection.profile}/${modelId}.`,
     );
   }
+  throw new Error(
+    `Reasoning effort ${selection.reasoningEffort} is not supported by any compatible Agent Profile.`,
+  );
+}
+
+function selectProfiles(
+  catalog: AgentProfileCatalog,
+  profileId: string | undefined,
+): readonly AgentProfileCatalogEntry[] {
+  if (profileId == null) return catalog.profiles;
+  const profile = catalog.profiles.find((entry) => entry.id === profileId);
+  if (profile == null) {
+    throw new Error(`Agent Profile ${profileId} is not available.`);
+  }
+  return [profile];
+}
+
+function throwSelectionFailure(
+  catalog: AgentProfileCatalog,
+  selection: { profile?: string; model?: string; reasoningEffort?: string },
+): never {
+  if (selection.profile != null) {
+    if (selection.model != null) {
+      throw new Error(
+        `Model ${selection.model} is not supported by Agent Profile ${selection.profile}.`,
+      );
+    }
+    throw new Error(
+      `Reasoning effort ${selection.reasoningEffort} requires a model for Agent Profile ${selection.profile}.`,
+    );
+  }
+  if (selection.model != null) {
+    throw new Error(
+      `Model ${selection.model} is not supported by any Agent Profile.`,
+    );
+  }
+  if (selection.reasoningEffort != null) {
+    throw new Error(
+      `Reasoning effort ${selection.reasoningEffort} is not supported by any profile default model.`,
+    );
+  }
+  if (catalog.profiles.length === 0) {
+    throw new Error("No Agent Profiles are available.");
+  }
+  throw new Error("Session selection is invalid.");
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -72,15 +72,16 @@ export async function createIncidentCommand(
   runtime: CreateIncidentRuntime,
   options: CreateIncidentCommandOptions,
 ): Promise<void> {
+  const inputs = await resolveCreateIncidentInputs({
+    summary: options.summary,
+    title: options.title,
+    repo: options.repo,
+    resolutionSummary: options.resolutionSummary,
+    env: runtime.env,
+    readGitOrigin: () => runtime.readGitOrigin(),
+  });
+
   await runIncidentOperation("create incident", runtime, async (apiRuntime) => {
-    const inputs = await resolveCreateIncidentInputs({
-      summary: options.summary,
-      title: options.title,
-      repo: options.repo,
-      resolutionSummary: options.resolutionSummary,
-      env: runtime.env,
-      readGitOrigin: () => runtime.readGitOrigin(),
-    });
     const result = await createIncident({
       ...apiRuntime,
       ...options,

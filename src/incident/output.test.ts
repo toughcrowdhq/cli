@@ -41,7 +41,7 @@ describe("incident output", () => {
     expect(stdout.output).toContain("Resolution: Rolled back [31m\n");
     expect(stdout.output).toContain("Resolved: 2026-08-18T21:00:00.000Z\n");
     expect(stdout.output).toContain(
-      "Created by: Ada Admin (33333333-3333-4333-8333-333333333333)\n",
+      "Created by: 33333333-3333-4333-8333-333333333333\n",
     );
     expect(stdout.output).toContain("Body:\nfirst line\nsecond [31m\n");
     expect(stdout.output).not.toContain("\u001B");
@@ -59,7 +59,9 @@ class MemoryWriter {
 function createIncident(overrides: Partial<Incident> = {}): Incident {
   return {
     id: "11111111-1111-4111-8111-111111111111",
-    repository: "acme/web",
+    repositoryFullName: "acme/web",
+    createdByUserId: "33333333-3333-4333-8333-333333333333",
+    updatedByUserId: null,
     title: "Checkout outage requires bounded display\u001B[31m",
     summary: "Checkout is down",
     severity: "p1",
@@ -68,11 +70,6 @@ function createIncident(overrides: Partial<Incident> = {}): Incident {
     createdAt: "2026-08-18T20:01:02.000Z",
     updatedAt: "2026-08-18T20:02:02.000Z",
     resolvedAt: null,
-    createdBy: {
-      id: "33333333-3333-4333-8333-333333333333",
-      name: "Ada\nAdmin",
-    },
-    updatedBy: null,
     ...overrides,
   };
 }

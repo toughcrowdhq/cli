@@ -39,7 +39,7 @@ describe("resolveCreateIncidentInputs", () => {
     expect(originReads).toBe(0);
   });
 
-  it("falls back to GitHub origin and otherwise leaves repository unset", async () => {
+  it("falls back to GitHub origin and requires a repository otherwise", async () => {
     await expect(
       resolveCreateIncidentInputs({
         summary: "Checkout is down",
@@ -55,10 +55,9 @@ describe("resolveCreateIncidentInputs", () => {
         title: "Checkout outage",
         readGitOrigin: () => Promise.resolve("git@gitlab.com:acme/web.git"),
       }),
-    ).resolves.toEqual({
-      summary: "Checkout is down",
-      title: "Checkout outage",
-    });
+    ).rejects.toThrow(
+      "Repository is required. Use --repo <owner/name>, set TOUGHCROWD_REPO, or run the command in a GitHub checkout with an origin remote.",
+    );
   });
 
   it("rejects invalid bounded input", async () => {

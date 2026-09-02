@@ -19,7 +19,7 @@ export interface CreateIncidentInputOptions {
 export interface ResolvedCreateIncidentInputs {
   summary: string;
   title: string;
-  repo?: string;
+  repo: string;
   resolutionSummary?: string;
 }
 
@@ -85,7 +85,7 @@ export function readCursor(value: string): string {
 
 async function resolveRepository(
   options: CreateIncidentInputOptions,
-): Promise<{ repo?: string }> {
+): Promise<{ repo: string }> {
   if (options.repo != null) {
     return { repo: readRepository(options.repo, "--repo") };
   }
@@ -109,7 +109,10 @@ async function resolveRepository(
     if (repository != null) return { repo: repository };
   }
 
-  return {};
+  throw new IncidentCommandError(
+    `Repository is required. Use --repo <owner/name>, set ${repositoryEnvironmentVariable}, or run the command in a GitHub checkout with an origin remote.`,
+    2,
+  );
 }
 
 function readRepository(value: string, source: string): string {

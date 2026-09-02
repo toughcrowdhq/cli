@@ -35,7 +35,9 @@ export function listIncidents(
   const query = new URLSearchParams();
   if (options.state != null) query.set("state", options.state);
   if (options.severity != null) query.set("severity", options.severity);
-  if (options.repo != null) query.set("repo", options.repo);
+  if (options.repo != null) {
+    query.set("repositoryFullName", options.repo);
+  }
   if (options.limit != null) query.set("limit", String(options.limit));
   if (options.cursor != null) query.set("cursor", options.cursor);
   return incidentRequest(options, {
@@ -63,7 +65,7 @@ export function createIncident(
     body: {
       summary: options.summary,
       title: options.title,
-      ...(options.repo == null ? {} : { repo: options.repo }),
+      ...(options.repo == null ? {} : { repositoryFullName: options.repo }),
       ...(options.severity == null ? {} : { severity: options.severity }),
       ...(options.state == null ? {} : { state: options.state }),
       ...(options.resolutionSummary == null
@@ -120,7 +122,7 @@ export function updateIncident(
     method: "PATCH",
     path: incidentPath(options.incidentId),
     body: {
-      ...(options.repo == null ? {} : { repo: options.repo }),
+      ...(options.repo == null ? {} : { repositoryFullName: options.repo }),
       ...(options.title == null ? {} : { title: options.title }),
       ...(options.summary == null ? {} : { summary: options.summary }),
       ...(options.severity == null ? {} : { severity: options.severity }),

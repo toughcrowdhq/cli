@@ -17,7 +17,9 @@ export interface IncidentActor {
 
 export interface Incident {
   id: string;
-  repository: string | null;
+  repositoryFullName: string;
+  createdByUserId: string | null;
+  updatedByUserId: string | null;
   title: string;
   summary: string;
   severity: IncidentSeverity;
@@ -26,8 +28,6 @@ export interface Incident {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
-  createdBy: IncidentActor | null;
-  updatedBy: IncidentActor | null;
 }
 
 export interface IncidentNote {
@@ -117,13 +117,11 @@ export function decodeIncidentNoteResponse(
 
 function decodeIncident(value: unknown): Incident {
   if (!isRecord(value)) throw new TypeError("incident is invalid");
-  const repository = readNullableString(value.repository, 255);
   const severity = readChoice(value.severity, incidentSeverities);
   const state = readChoice(value.state, incidentStates);
   const resolutionSummary = readNullableString(value.resolutionSummary, 10_000);
   const resolvedAt = readNullableTimestamp(value.resolvedAt);
   if (
-    repository === undefined ||
     severity == null ||
     state == null ||
     resolutionSummary === undefined ||
@@ -133,7 +131,9 @@ function decodeIncident(value: unknown): Incident {
   }
   return {
     id: readUuid(value.id),
-    repository,
+    repositoryFullName: readString(value.repositoryFullName, 255, false),
+    createdByUserId: readNullableUuid(value.createdByUserId),
+    updatedByUserId: readNullableUuid(value.updatedByUserId),
     title: readString(value.title, 300, false),
     summary: readString(value.summary, 10_000, false),
     severity,
@@ -142,8 +142,6 @@ function decodeIncident(value: unknown): Incident {
     createdAt: readTimestamp(value.createdAt),
     updatedAt: readTimestamp(value.updatedAt),
     resolvedAt,
-    createdBy: decodeNullableActor(value.createdBy),
-    updatedBy: decodeNullableActor(value.updatedBy),
   };
 }
 
@@ -217,6 +215,10 @@ function readNullableTimestamp(value: unknown): string | null | undefined {
   if (value === null) return null;
   if (value === undefined) return undefined;
   return readTimestamp(value);
+}
+
+function readNullableUuid(value: unknown): string | null {
+  return value === null ? null : readUuid(value);
 }
 
 function readChoice<const T extends readonly string[]>(

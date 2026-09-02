@@ -91,7 +91,7 @@ function printIncidentFields(stdout: Writable, incident: Incident): void {
   stdout.write(`State: ${incident.state}\n`);
   stdout.write(`Severity: ${incident.severity}\n`);
   stdout.write(
-    `Repository: ${formatValue(incident.repository ?? "(none)", 255)}\n`,
+    `Repository: ${formatValue(incident.repositoryFullName, 255)}\n`,
   );
   stdout.write(`Title: ${formatValue(incident.title, 300)}\n`);
   stdout.write(`Summary: ${formatValue(incident.summary, 10_000)}\n`);
@@ -101,8 +101,8 @@ function printIncidentFields(stdout: Writable, incident: Incident): void {
   stdout.write(`Created: ${incident.createdAt}\n`);
   stdout.write(`Updated: ${incident.updatedAt}\n`);
   stdout.write(`Resolved: ${incident.resolvedAt ?? "(none)"}\n`);
-  stdout.write(`Created by: ${formatActor(incident.createdBy)}\n`);
-  stdout.write(`Updated by: ${formatActor(incident.updatedBy)}\n`);
+  stdout.write(`Created by: ${formatUserId(incident.createdByUserId)}\n`);
+  stdout.write(`Updated by: ${formatUserId(incident.updatedByUserId)}\n`);
 }
 
 function printIncidentNote(stdout: Writable, note: IncidentNote): void {
@@ -121,7 +121,7 @@ function formatIncidentRow(incident: Incident): string {
     id: incident.id,
     state: incident.state,
     severity: incident.severity,
-    repository: incident.repository ?? "(none)",
+    repository: incident.repositoryFullName,
     title: incident.title,
     updatedAt: incident.updatedAt,
   });
@@ -142,9 +142,13 @@ function formatColumn(value: string, width: number): string {
   return bounded.padEnd(width);
 }
 
-function formatActor(actor: Incident["createdBy"]): string {
+function formatActor(actor: IncidentNote["createdBy"]): string {
   if (actor == null) return "(unknown)";
   return `${formatTerminalValue(actor.name)} (${actor.id})`;
+}
+
+function formatUserId(userId: string | null): string {
+  return userId ?? "(unknown)";
 }
 
 function formatValue(value: string, maximumLength: number): string {

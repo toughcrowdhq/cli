@@ -19,11 +19,10 @@ describe("incident response decoding", () => {
 
     expect(result.incident).toEqual(createIncident());
     expect(result.incident).not.toHaveProperty("internalPayload");
-    expect(result.incident.createdBy).toEqual({
-      id: "33333333-3333-4333-8333-333333333333",
-      name: "Ada",
-    });
-    expect(result.incident.updatedBy).toBeNull();
+    expect(result.incident.createdByUserId).toBe(
+      "33333333-3333-4333-8333-333333333333",
+    );
+    expect(result.incident.updatedByUserId).toBeNull();
   });
 
   it("rejects invalid choices, duplicates, cursors, and attribution", () => {
@@ -46,9 +45,9 @@ describe("incident response decoding", () => {
     ).toThrow("incident list response is invalid");
     expect(() =>
       decodeIncidentResponse({
-        incident: { ...createIncident(), createdBy: { id: incidentId } },
+        incident: { ...createIncident(), createdByUserId: "not-a-uuid" },
       }),
-    ).toThrow("string field is invalid");
+    ).toThrow("UUID field is invalid");
   });
 
   it("validates note pages chronologically as opaque server output", () => {
@@ -72,7 +71,9 @@ describe("incident response decoding", () => {
 function createIncident() {
   return {
     id: incidentId,
-    repository: "acme/web",
+    repositoryFullName: "acme/web",
+    createdByUserId: "33333333-3333-4333-8333-333333333333",
+    updatedByUserId: null,
     title: "Checkout outage",
     summary: "Checkout is down",
     severity: "p1",
@@ -81,8 +82,6 @@ function createIncident() {
     createdAt: "2026-08-18T20:01:02.000Z",
     updatedAt: "2026-08-18T20:02:02.000Z",
     resolvedAt: null,
-    createdBy: { id: "33333333-3333-4333-8333-333333333333", name: "Ada" },
-    updatedBy: null,
   };
 }
 

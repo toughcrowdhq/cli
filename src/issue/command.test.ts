@@ -379,7 +379,6 @@ describe("issue commands", () => {
     const fetch = createIssueFetch({
       type: "task",
       priority: "medium",
-      severity: null,
     });
     const runtime = createAuthenticatedRuntime(fetch);
 
@@ -407,7 +406,7 @@ describe("issue commands", () => {
     ]);
     expect(fetch.calls[1].body).toEqual({
       version: 1,
-      categorization: { type: "bug", priority: "high", severity: null },
+      categorization: { type: "bug", priority: "high" },
     });
   });
 
@@ -442,11 +441,10 @@ describe("issue commands", () => {
     });
   });
 
-  it("clears priority and clears bug-only severity when changing to a non-bug type", async () => {
+  it("updates categorization without the retired severity field", async () => {
     const clearPriorityFetch = createIssueFetch({
       type: "bug",
       priority: "urgent",
-      severity: "critical",
     });
     const clearPriorityRuntime = createAuthenticatedRuntime(clearPriorityFetch);
     expect(
@@ -465,13 +463,12 @@ describe("issue commands", () => {
     ).toBe(0);
     expect(clearPriorityFetch.calls[1].body).toEqual({
       version: 1,
-      categorization: { type: "bug", priority: null, severity: "critical" },
+      categorization: { type: "bug", priority: null },
     });
 
     const changeTypeFetch = createIssueFetch({
       type: "bug",
       priority: "urgent",
-      severity: "critical",
     });
     const changeTypeRuntime = createAuthenticatedRuntime(changeTypeFetch);
     expect(
@@ -493,7 +490,6 @@ describe("issue commands", () => {
       categorization: {
         type: "feature",
         priority: "urgent",
-        severity: null,
       },
     });
   });
@@ -700,7 +696,6 @@ function createIssueRecord(overrides: Record<string, unknown> = {}) {
     description: "Production checkout fails.",
     type: "task",
     priority: null,
-    severity: null,
     state: "open",
     resolutionDisposition: null,
     resolutionNote: null,

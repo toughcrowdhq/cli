@@ -51,7 +51,6 @@ function createIssue(): Issue {
     description: "Production checkout fails.",
     type: "bug",
     priority: "high",
-    severity: "critical",
     state: "open",
     resolutionDisposition: null,
     resolutionNote: null,

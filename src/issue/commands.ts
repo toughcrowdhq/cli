@@ -45,7 +45,7 @@ import {
   resolveAuthenticatedIssueApiRuntime,
   type IssueRuntime,
 } from "./runtime.js";
-import type { IssuePriority, IssueSeverity, IssueType } from "./types.js";
+import type { IssuePriority, IssueType } from "./types.js";
 
 interface JsonOption {
   json?: boolean;
@@ -195,7 +195,6 @@ function mergeIssueCategorization(
   current: {
     type: IssueType;
     priority: IssuePriority | null;
-    severity: IssueSeverity | null;
   },
   update: Pick<UpdateIssueCommandOptions, "type" | "priority">,
 ) {
@@ -204,7 +203,6 @@ function mergeIssueCategorization(
     type,
     priority:
       update.priority === undefined ? current.priority : update.priority,
-    severity: type === "bug" ? current.severity : null,
   };
 }
 

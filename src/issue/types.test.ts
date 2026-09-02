@@ -159,7 +159,6 @@ function createIssue() {
     description: "Production checkout fails.",
     type: "task" as const,
     priority: null,
-    severity: null,
     state: "open" as const,
     resolutionDisposition: null,
     resolutionNote: null,

@@ -7,13 +7,9 @@ export type IssueType = (typeof issueTypes)[number];
 export const issuePriorities = ["urgent", "high", "medium", "low"] as const;
 export type IssuePriority = (typeof issuePriorities)[number];
 
-export const issueSeverities = ["critical", "high", "medium", "low"] as const;
-export type IssueSeverity = (typeof issueSeverities)[number];
-
 export type IssueCategorization = {
   type: IssueType;
   priority: IssuePriority | null;
-  severity: IssueSeverity | null;
 };
 
 export const issueDispositions = [
@@ -42,7 +38,6 @@ export interface Issue {
   description: string;
   type: IssueType;
   priority: IssuePriority | null;
-  severity: IssueSeverity | null;
   state: IssueState;
   resolutionDisposition: IssueDisposition | null;
   resolutionNote: string | null;
@@ -456,7 +451,6 @@ function decodeIssue(
   const state = readChoice(value.state, issueStates);
   const type = readChoice(value.type, issueTypes);
   const priority = readNullableChoice(value.priority, issuePriorities);
-  const severity = readNullableChoice(value.severity, issueSeverities);
   const repositoryFullName =
     projections?.repositoryFullName ??
     readOptionalString(value.repositoryFullName, 255);
@@ -466,8 +460,7 @@ function decodeIssue(
     resolutionNote === undefined ||
     state == null ||
     type == null ||
-    priority === undefined ||
-    severity === undefined
+    priority === undefined
   ) {
     throw new TypeError("issue is invalid");
   }
@@ -478,7 +471,6 @@ function decodeIssue(
     description: readString(value.description, 20_000, false),
     type,
     priority,
-    severity,
     state,
     resolutionDisposition,
     resolutionNote,

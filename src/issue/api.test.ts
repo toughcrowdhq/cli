@@ -70,7 +70,6 @@ describe("issue API", () => {
       categorization: {
         type: "bug",
         priority: "high",
-        severity: "critical",
       },
     });
     await resolveIssue({
@@ -121,7 +120,6 @@ describe("issue API", () => {
       categorization: {
         type: "bug",
         priority: "high",
-        severity: "critical",
       },
     });
     expect(fetch.calls[4].body).toEqual({
@@ -283,7 +281,6 @@ function createIssueRecord(overrides: Record<string, unknown> = {}) {
     description: "Production checkout fails.",
     type: "task",
     priority: null,
-    severity: null,
     state: "open",
     resolutionDisposition: null,
     resolutionNote: null,

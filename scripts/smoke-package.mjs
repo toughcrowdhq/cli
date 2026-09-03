@@ -122,6 +122,11 @@ try {
     ["incident", "create", "--help"],
     { encoding: "utf8" },
   );
+  const incidentNoteDeleteHelpOutput = execFileSync(
+    executable,
+    ["incident", "note", "delete", "--help"],
+    { encoding: "utf8" },
+  );
   const deployReportHelpOutput = execFileSync(
     executable,
     ["deploy", "report", "--help"],
@@ -265,13 +270,16 @@ Commands:
         "  create [options] <summary>           Create an incident\n",
       ) &&
       incidentHelpOutput.includes(
-        "  note [options] <incident-id> <body>  Add or edit incident notes\n",
+        "  note [options] <incident-id> <body>  Add, edit, or delete incident notes\n",
       ) &&
       incidentCreateHelpOutput.includes(
         "Usage: toughcrowd incident create [options] <summary>\n",
       ) &&
       incidentCreateHelpOutput.includes(
         "  --resolution-summary <text>  resolution summary\n",
+      ) &&
+      incidentNoteDeleteHelpOutput.includes(
+        "Usage: toughcrowd incident note delete [options] <incident-id> <note-id>\n",
       ),
     "installed CLI returned the wrong incident help output",
   );

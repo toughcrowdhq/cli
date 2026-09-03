@@ -25,6 +25,7 @@ const exitCode = await runCli(
     "main",
     "--title",
     "Fix package checkout",
+    "--no-defaults",
     "--json",
   ],
   {

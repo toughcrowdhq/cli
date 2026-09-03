@@ -299,14 +299,22 @@ Use the Incident Repository workflow for externally observed incidents:
 
 ```sh
 toughcrowd incident create "Checkout API is returning 503s" \
-  --title "Checkout outage" --repo acme/web --severity p1
+  --title "Checkout outage" --repo acme/web --severity p1 \
+  --started-at 2026-09-02T09:00:00-07:00 \
+  --detected-at 2026-09-02T09:05:00-07:00
 toughcrowd incident list --state active --severity p1 --repo acme/web
 toughcrowd incident get <incident-id> --limit 25
 toughcrowd incident update <incident-id> \
-  --state resolved --resolution-summary "Rolled back the bad deployment"
+  --state resolved --resolution-summary "Rolled back the bad deployment" \
+  --resolved-at 2026-09-02T10:15:00-07:00
 toughcrowd incident update <incident-id> --state active
 toughcrowd incident note <incident-id> "First customer report arrived at 20:03Z."
 toughcrowd incident note update <incident-id> <note-id> "Corrected timestamp."
+toughcrowd incident note delete <incident-id> <note-id>
+toughcrowd incident component list
+toughcrowd incident component create "Checkout API" \
+  --description "Customer-facing checkout requests"
+toughcrowd incident component update <component-id> --archive
 ```
 
 `incident create` resolves the repository from `--repo`, then
@@ -319,14 +327,42 @@ Severity values are `p0`, `p1`, `p2`, `p3`, and `unclassified`. State values
 are `active` and `resolved`. Resolve and reopen incidents with
 `incident update`; there are no separate resolve or reopen commands.
 
-Every incident operation accepts `--json`. Human output strips terminal control
-characters and prints lifecycle state, severity, resolution, timestamps,
-attribution, and note bodies as server-provided incident content. `incident get`
-combines the current incident detail with one bounded chronological notes page
-and prints `nextCursor` when more notes are available. Pass `--limit <count>`
-from 1 to 100 and return opaque cursors unchanged with `--cursor`.
+Operational time options are `--started-at`, `--detected-at`, `--mitigated-at`,
+and `--resolved-at`. Values must be ISO 8601 timestamps with an explicit offset
+and are normalized to UTC. Each has a corresponding `--clear-...` option for
+recording that the time is unknown. Resolving without `--resolved-at` uses the
+server time; `--clear-resolved-at` records an intentionally unknown resolution
+time. Reopening clears the mitigation and resolution fields.
 
-Incident and note updates are last-write-wins. The CLI does not accept expected
+Use `incident component list` to discover component IDs. Organization Admins
+can create, edit, archive, and unarchive components. Add impacts during create,
+or replace the complete impact set during update, with `--impacts <json>`:
+
+```sh
+toughcrowd incident update <incident-id> --impacts \
+  '[{"componentId":"<component-id>","condition":"partial_outage"}]'
+toughcrowd incident update <incident-id> --impacts '[]'
+```
+
+Impact conditions are `unknown`, `degraded`, `partial_outage`, and
+`unavailable`. When the organization has no configured components, omit
+`componentId` to record a system-wide impact. Once components exist, impacts
+must select an active component. Updating impacts replaces the entire set;
+`[]` clears it.
+
+Every incident operation accepts `--json`. Human output strips terminal control
+characters and prints lifecycle state, severity, operational timestamps,
+component impacts, attribution, and note bodies as server-provided incident
+content. Incident notes support report-grade Markdown up to 256 KiB each when
+encoded as UTF-8; summaries and resolution summaries remain limited to 10,000
+characters. The service permits up to 10 MiB of notes per incident.
+`incident get` combines the current incident detail with one bounded
+chronological notes page and prints `nextCursor` when more notes are available.
+Pass `--limit <count>` from 1 to 100 and return opaque cursors unchanged with
+`--cursor`.
+
+Incident and note updates are last-write-wins. Note deletion is permanent and
+returns the deleted incident and note IDs when `--json` is used. The CLI does not accept expected
 version flags, create incident-specific idempotency keys, retry POST requests,
 cache disabled-feature decisions, store local incident data, retain note
 revisions, poll, schedule work, add memory commands, or connect incidents to

@@ -2,33 +2,49 @@ import { ApiClientError } from "../api/errors.js";
 import { apiKeyEnvironmentVariable } from "../auth/credentials.js";
 import { AuthCommandError } from "../auth/errors.js";
 import {
+  createIncidentComponent,
   createIncident,
   createIncidentNote,
+  deleteIncidentNote,
   getIncident,
+  listIncidentComponents,
   listIncidentNotes,
   listIncidents,
   updateIncident,
+  updateIncidentComponent,
   updateIncidentNote,
+  type CreateIncidentComponentRequest,
   type CreateIncidentNoteRequest,
   type CreateIncidentRequest,
+  type DeleteIncidentNoteRequest,
   type ListIncidentNotesRequest,
   type ListIncidentsRequest,
   type UpdateIncidentNoteRequest,
+  type UpdateIncidentComponentRequest,
   type UpdateIncidentRequest,
 } from "./api.js";
 import { IncidentCommandError } from "./errors.js";
 import {
+  readComponentName,
+  readOptionalComponentDescription,
+  readOptionalComponentName,
+  readOptionalImpacts,
   readOptionalNarrative,
+  readOptionalNullableNarrative,
+  readOptionalOperationalTimestamp,
   readOptionalRepository,
   readOptionalTitle,
-  readRequiredNarrative,
+  readRequiredIncidentNoteBody,
   resolveCreateIncidentInputs,
   type IncidentCreationEnvironment,
 } from "./inputs.js";
 import {
+  printIncidentComponentList,
+  printIncidentComponentResponse,
   printIncidentDetail,
   printIncidentList,
   printIncidentNoteResponse,
+  printIncidentNoteDeletion,
   printIncidentResponse,
 } from "./output.js";
 import {
@@ -48,6 +64,13 @@ export type CreateIncidentNoteCommandOptions = CreateIncidentNoteRequest &
   JsonOption;
 export type UpdateIncidentNoteCommandOptions = UpdateIncidentNoteRequest &
   JsonOption;
+export type DeleteIncidentNoteCommandOptions = DeleteIncidentNoteRequest &
+  JsonOption;
+export type ListIncidentComponentsCommandOptions = JsonOption;
+export type CreateIncidentComponentCommandOptions =
+  CreateIncidentComponentRequest & JsonOption;
+export type UpdateIncidentComponentCommandOptions =
+  UpdateIncidentComponentRequest & JsonOption;
 
 export interface CreateIncidentRuntime extends IncidentRuntime {
   env?: IncidentRuntime["env"] & IncidentCreationEnvironment;
@@ -86,6 +109,23 @@ export async function createIncidentCommand(
       ...apiRuntime,
       ...options,
       ...inputs,
+      startedAt: readOptionalOperationalTimestamp(
+        options.startedAt,
+        "Started time",
+      ),
+      detectedAt: readOptionalOperationalTimestamp(
+        options.detectedAt,
+        "Detected time",
+      ),
+      mitigatedAt: readOptionalOperationalTimestamp(
+        options.mitigatedAt,
+        "Mitigated time",
+      ),
+      resolvedAt: readOptionalOperationalTimestamp(
+        options.resolvedAt,
+        "Resolved time",
+      ),
+      impacts: readOptionalImpacts(options.impacts),
     });
     printIncidentResponse(
       runtime.stdout,
@@ -135,10 +175,27 @@ export async function updateIncidentCommand(
       summary: readOptionalNarrative(options.summary, "Summary"),
       severity: options.severity,
       state: options.state,
-      resolutionSummary: readOptionalNarrative(
+      resolutionSummary: readOptionalNullableNarrative(
         options.resolutionSummary,
         "Resolution summary",
       ),
+      startedAt: readOptionalOperationalTimestamp(
+        options.startedAt,
+        "Started time",
+      ),
+      detectedAt: readOptionalOperationalTimestamp(
+        options.detectedAt,
+        "Detected time",
+      ),
+      mitigatedAt: readOptionalOperationalTimestamp(
+        options.mitigatedAt,
+        "Mitigated time",
+      ),
+      resolvedAt: readOptionalOperationalTimestamp(
+        options.resolvedAt,
+        "Resolved time",
+      ),
+      impacts: readOptionalImpacts(options.impacts),
     });
     printIncidentResponse(
       runtime.stdout,
@@ -147,6 +204,68 @@ export async function updateIncidentCommand(
       options.json === true,
     );
   });
+}
+
+export async function listIncidentComponentsCommand(
+  runtime: IncidentRuntime,
+  options: ListIncidentComponentsCommandOptions,
+): Promise<void> {
+  await runIncidentOperation(
+    "list incident components",
+    runtime,
+    async (apiRuntime) => {
+      const result = await listIncidentComponents(apiRuntime);
+      printIncidentComponentList(runtime.stdout, result, options.json === true);
+    },
+  );
+}
+
+export async function createIncidentComponentCommand(
+  runtime: IncidentRuntime,
+  options: CreateIncidentComponentCommandOptions,
+): Promise<void> {
+  await runIncidentOperation(
+    "create incident component",
+    runtime,
+    async (apiRuntime) => {
+      const result = await createIncidentComponent({
+        ...apiRuntime,
+        name: readComponentName(options.name),
+        description: readOptionalComponentDescription(options.description),
+      });
+      printIncidentComponentResponse(
+        runtime.stdout,
+        result,
+        "created",
+        options.json === true,
+      );
+    },
+  );
+}
+
+export async function updateIncidentComponentCommand(
+  runtime: IncidentRuntime,
+  options: UpdateIncidentComponentCommandOptions,
+): Promise<void> {
+  await runIncidentOperation(
+    "update incident component",
+    runtime,
+    async (apiRuntime) => {
+      const result = await updateIncidentComponent({
+        ...apiRuntime,
+        componentId: options.componentId,
+        name: readOptionalComponentName(options.name),
+        description: readOptionalComponentDescription(options.description),
+        archived: options.archived,
+      });
+      printIncidentComponentResponse(
+        runtime.stdout,
+        result,
+        "updated",
+        options.json === true,
+      );
+    },
+  );
 }
 
 export async function createIncidentNoteCommand(
@@ -160,7 +279,7 @@ export async function createIncidentNoteCommand(
       const result = await createIncidentNote({
         ...apiRuntime,
         incidentId: options.incidentId,
-        body: readRequiredNarrative(options.body, "Note body"),
+        body: readRequiredIncidentNoteBody(options.body),
       });
       printIncidentNoteResponse(
         runtime.stdout,
@@ -184,12 +303,35 @@ export async function updateIncidentNoteCommand(
         ...apiRuntime,
         incidentId: options.incidentId,
         noteId: options.noteId,
-        body: readRequiredNarrative(options.body, "Note body"),
+        body: readRequiredIncidentNoteBody(options.body),
       });
       printIncidentNoteResponse(
         runtime.stdout,
         result,
         "updated",
+        options.json === true,
+      );
+    },
+  );
+}
+
+export async function deleteIncidentNoteCommand(
+  runtime: IncidentRuntime,
+  options: DeleteIncidentNoteCommandOptions,
+): Promise<void> {
+  await runIncidentOperation(
+    "delete incident note",
+    runtime,
+    async (apiRuntime) => {
+      await deleteIncidentNote({
+        ...apiRuntime,
+        incidentId: options.incidentId,
+        noteId: options.noteId,
+      });
+      printIncidentNoteDeletion(
+        runtime.stdout,
+        options.incidentId,
+        options.noteId,
         options.json === true,
       );
     },

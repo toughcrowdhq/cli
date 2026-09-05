@@ -1,3 +1,5 @@
+import { incidentNoteBodyBytes, incidentNoteBodyMaxBytes } from "./limits.js";
+
 export const incidentSeverities = [
   "p0",
   "p1",
@@ -10,9 +12,28 @@ export type IncidentSeverity = (typeof incidentSeverities)[number];
 export const incidentStates = ["active", "resolved"] as const;
 export type IncidentState = (typeof incidentStates)[number];
 
+export const incidentImpactConditions = [
+  "unknown",
+  "degraded",
+  "partial_outage",
+  "unavailable",
+] as const;
+export type IncidentImpactCondition = (typeof incidentImpactConditions)[number];
+
 export interface IncidentActor {
   id: string;
   name: string;
+}
+
+export interface IncidentImpact {
+  id: string;
+  component: { id: string; name: string } | null;
+  condition: IncidentImpactCondition;
+}
+
+export interface IncidentImpactInput {
+  componentId?: string | null;
+  condition: IncidentImpactCondition;
 }
 
 export interface Incident {
@@ -24,10 +45,34 @@ export interface Incident {
   summary: string;
   severity: IncidentSeverity;
   state: IncidentState;
+  startedAt: string | null;
+  detectedAt: string | null;
+  mitigatedAt: string | null;
   resolutionSummary: string | null;
+  impacts: readonly IncidentImpact[];
+  createdBy: IncidentActor | null;
+  updatedBy: IncidentActor | null;
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+}
+
+export interface IncidentComponent {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IncidentComponentResponse {
+  component: IncidentComponent;
+}
+
+export interface IncidentComponentList {
+  components: readonly IncidentComponent[];
 }
 
 export interface IncidentNote {
@@ -115,17 +160,53 @@ export function decodeIncidentNoteResponse(
   return { note: decodeIncidentNote(value.note) };
 }
 
+export function decodeIncidentComponentResponse(
+  value: unknown,
+): IncidentComponentResponse {
+  if (!isRecord(value)) {
+    throw new TypeError("incident component response is invalid");
+  }
+  return { component: decodeIncidentComponent(value.component) };
+}
+
+export function decodeIncidentComponentList(
+  value: unknown,
+): IncidentComponentList {
+  if (!isRecord(value) || !Array.isArray(value.components)) {
+    throw new TypeError("incident component list response is invalid");
+  }
+  const components = value.components.map(decodeIncidentComponent);
+  if (
+    new Set(components.map((component) => component.id)).size !==
+    components.length
+  ) {
+    throw new TypeError("incident component list response is invalid");
+  }
+  return { components };
+}
+
 function decodeIncident(value: unknown): Incident {
   if (!isRecord(value)) throw new TypeError("incident is invalid");
   const severity = readChoice(value.severity, incidentSeverities);
   const state = readChoice(value.state, incidentStates);
   const resolutionSummary = readNullableString(value.resolutionSummary, 10_000);
+  const startedAt = readNullableTimestamp(value.startedAt);
+  const detectedAt = readNullableTimestamp(value.detectedAt);
+  const mitigatedAt = readNullableTimestamp(value.mitigatedAt);
   const resolvedAt = readNullableTimestamp(value.resolvedAt);
+  if (!Array.isArray(value.impacts)) throw new TypeError("incident is invalid");
+  const impacts = value.impacts.map(decodeIncidentImpact);
   if (
     severity == null ||
     state == null ||
     resolutionSummary === undefined ||
-    resolvedAt === undefined
+    startedAt === undefined ||
+    detectedAt === undefined ||
+    mitigatedAt === undefined ||
+    resolvedAt === undefined ||
+    new Set(impacts.map((impact) => impact.id)).size !== impacts.length ||
+    new Set(impacts.map((impact) => impact.component?.id ?? "system")).size !==
+      impacts.length
   ) {
     throw new TypeError("incident is invalid");
   }
@@ -138,10 +219,56 @@ function decodeIncident(value: unknown): Incident {
     summary: readString(value.summary, 10_000, false),
     severity,
     state,
+    startedAt,
+    detectedAt,
+    mitigatedAt,
     resolutionSummary,
+    impacts,
+    createdBy: decodeNullableActor(value.createdBy),
+    updatedBy: decodeNullableActor(value.updatedBy),
     createdAt: readTimestamp(value.createdAt),
     updatedAt: readTimestamp(value.updatedAt),
     resolvedAt,
+  };
+}
+
+function decodeIncidentImpact(value: unknown): IncidentImpact {
+  if (!isRecord(value)) throw new TypeError("incident impact is invalid");
+  const condition = readChoice(value.condition, incidentImpactConditions);
+  if (condition == null) throw new TypeError("incident impact is invalid");
+  return {
+    id: readUuid(value.id),
+    component: decodeNullableImpactComponent(value.component),
+    condition,
+  };
+}
+
+function decodeNullableImpactComponent(
+  value: unknown,
+): IncidentImpact["component"] {
+  if (value === null) return null;
+  if (!isRecord(value)) throw new TypeError("incident impact is invalid");
+  return {
+    id: readUuid(value.id),
+    name: readString(value.name, 120, false),
+  };
+}
+
+function decodeIncidentComponent(value: unknown): IncidentComponent {
+  if (!isRecord(value)) throw new TypeError("incident component is invalid");
+  const description = readNullableString(value.description, 1_000);
+  const archivedAt = readNullableTimestamp(value.archivedAt);
+  if (description === undefined || archivedAt === undefined) {
+    throw new TypeError("incident component is invalid");
+  }
+  return {
+    id: readUuid(value.id),
+    organizationId: readUuid(value.organizationId),
+    name: readString(value.name, 120, false),
+    description,
+    archivedAt,
+    createdAt: readTimestamp(value.createdAt),
+    updatedAt: readTimestamp(value.updatedAt),
   };
 }
 
@@ -150,12 +277,23 @@ function decodeIncidentNote(value: unknown): IncidentNote {
   return {
     id: readUuid(value.id),
     incidentId: readUuid(value.incidentId),
-    body: readString(value.body, 10_000, false),
+    body: readIncidentNoteBody(value.body),
     createdAt: readTimestamp(value.createdAt),
     updatedAt: readTimestamp(value.updatedAt),
     createdBy: decodeNullableActor(value.createdBy),
     updatedBy: decodeNullableActor(value.updatedBy),
   };
+}
+
+function readIncidentNoteBody(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    value.trim().length === 0 ||
+    incidentNoteBodyBytes(value) > incidentNoteBodyMaxBytes
+  ) {
+    throw new TypeError("incident note body is invalid");
+  }
+  return value;
 }
 
 function decodeNullableActor(value: unknown): IncidentActor | null {

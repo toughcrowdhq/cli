@@ -122,6 +122,11 @@ try {
     ["incident", "create", "--help"],
     { encoding: "utf8" },
   );
+  const incidentNoteDeleteHelpOutput = execFileSync(
+    executable,
+    ["incident", "note", "delete", "--help"],
+    { encoding: "utf8" },
+  );
   const deployReportHelpOutput = execFileSync(
     executable,
     ["deploy", "report", "--help"],
@@ -190,6 +195,18 @@ try {
         "scripts/fixtures/package-smoke-deploy-report.mjs",
       ),
       resolve(installedPackageDirectory, "dist/cli.js"),
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
+  const incidentNoteSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(
+        packageDirectory,
+        "scripts/fixtures/package-smoke-incident-note.mjs",
+      ),
+      executable,
       metadata.version,
     ],
     { encoding: "utf8" },
@@ -265,13 +282,16 @@ Commands:
         "  create [options] <summary>           Create an incident\n",
       ) &&
       incidentHelpOutput.includes(
-        "  note [options] <incident-id> <body>  Add or edit incident notes\n",
+        "  note [options] <incident-id> [body]  Add, edit, or delete incident notes\n",
       ) &&
       incidentCreateHelpOutput.includes(
         "Usage: toughcrowd incident create [options] <summary>\n",
       ) &&
       incidentCreateHelpOutput.includes(
         "  --resolution-summary <text>  resolution summary\n",
+      ) &&
+      incidentNoteDeleteHelpOutput.includes(
+        "Usage: toughcrowd incident note delete [options] <incident-id> <note-id>\n",
       ),
     "installed CLI returned the wrong incident help output",
   );
@@ -309,6 +329,10 @@ Commands:
   assert(
     deployReportSmokeOutput === "Verified installed deploy report\n",
     "installed CLI failed the authenticated deploy-report smoke test",
+  );
+  assert(
+    incidentNoteSmokeOutput === "Verified installed 256 KiB incident note\n",
+    "installed CLI failed the 256 KiB incident-note smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

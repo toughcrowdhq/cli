@@ -2,9 +2,71 @@ import { describe, expect, it } from "vitest";
 import { ApiClientError } from "./errors.js";
 import {
   requestJson,
+  requestNoContent,
   type FetchLike,
   type TimerCapabilities,
 } from "./request.js";
+
+describe("requestNoContent", () => {
+  it("accepts an authenticated 204 response without a content type", async () => {
+    const fetch = createFetch(new Response(null, { status: 204 }));
+
+    await expect(
+      requestNoContent({
+        method: "DELETE",
+        path: "/api/incidents/incident-id/notes/note-id",
+        authorization: "Bearer tc_secret",
+        requestId: "req_cli_delete",
+        fetch,
+        timers: immediateTimers,
+        metadata: stableMetadata,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(fetch.calls[0]).toMatchObject({
+      url: "https://api.toughcrowd.dev/api/incidents/incident-id/notes/note-id",
+      init: { method: "DELETE", redirect: "manual" },
+    });
+  });
+
+  it("rejects a different successful status", async () => {
+    await expect(
+      requestNoContent({
+        method: "DELETE",
+        path: "/api/example",
+        fetch: createFetch(new Response(null, { status: 200 })),
+        timers: immediateTimers,
+      }),
+    ).rejects.toMatchObject({
+      kind: "malformed-response",
+      message: "API response did not return 204 No Content",
+      status: 200,
+    });
+  });
+
+  it("parses structured JSON errors", async () => {
+    await expect(
+      requestNoContent({
+        method: "DELETE",
+        path: "/api/example",
+        fetch: createFetch(
+          new Response(
+            JSON.stringify({
+              error: { code: "not-found", message: "Incident note not found." },
+            }),
+            { status: 404, headers: { "content-type": "application/json" } },
+          ),
+        ),
+        timers: immediateTimers,
+      }),
+    ).rejects.toMatchObject({
+      kind: "api",
+      code: "not-found",
+      message: "Incident note not found.",
+      status: 404,
+    });
+  });
+});
 
 describe("requestJson", () => {
   it("sends an authenticated JSON request to the canonical origin", async () => {

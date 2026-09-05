@@ -29,7 +29,7 @@ export interface ClientMetadata {
   arch: string;
 }
 
-export interface RequestJsonOptions<T> {
+interface RequestOptions {
   origin?: string;
   method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
   path: string;
@@ -42,8 +42,13 @@ export interface RequestJsonOptions<T> {
   fetch?: FetchLike;
   timers?: TimerCapabilities;
   metadata?: Partial<ClientMetadata>;
+}
+
+export interface RequestJsonOptions<T> extends RequestOptions {
   decode: ResponseDecoder<T>;
 }
+
+export type RequestNoContentOptions = RequestOptions;
 
 const defaultTimeoutMs = 30_000;
 const jsonContentType = "application/json";
@@ -51,6 +56,21 @@ const requestIdHeader = "x-request-id";
 
 export async function requestJson<T>(
   options: RequestJsonOptions<T>,
+): Promise<T> {
+  return request(options, (response) =>
+    decodeSuccessResponse(response, options.decode),
+  );
+}
+
+export async function requestNoContent(
+  options: RequestNoContentOptions,
+): Promise<void> {
+  return request(options, decodeNoContentResponse);
+}
+
+async function request<T>(
+  options: RequestOptions,
+  decodeSuccess: (response: Response) => Promise<T>,
 ): Promise<T> {
   const origin = parseApiOrigin(options.origin ?? defaultApiOrigin);
   const url = createApiUrl(origin, options.path);
@@ -78,7 +98,7 @@ export async function requestJson<T>(
     });
 
     if (response.ok) {
-      return await decodeSuccessResponse(response, options.decode);
+      return await decodeSuccess(response);
     }
 
     return await decodeErrorResponse(response);
@@ -87,6 +107,18 @@ export async function requestJson<T>(
   } finally {
     timers.clearTimeout(timeoutId);
   }
+}
+
+function decodeNoContentResponse(response: Response): Promise<void> {
+  if (response.status !== 204) {
+    throw new ApiClientError({
+      kind: "malformed-response",
+      message: "API response did not return 204 No Content",
+      status: response.status,
+      requestId: readHeader(response, requestIdHeader),
+    });
+  }
+  return Promise.resolve();
 }
 
 function createApiUrl(origin: string, path: string): URL {
@@ -108,10 +140,7 @@ function createApiUrl(origin: string, path: string): URL {
   return url;
 }
 
-function createHeaders(
-  options: RequestJsonOptions<unknown>,
-  requestId: string,
-): Headers {
+function createHeaders(options: RequestOptions, requestId: string): Headers {
   const metadata = createClientMetadata(options.metadata);
   const headers = new Headers({
     accept: jsonContentType,

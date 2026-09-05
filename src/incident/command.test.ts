@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runCli, type CliRuntime } from "../cli.js";
 import type { CredentialStore } from "../auth/credentials.js";
 import type { FetchLike } from "../api/request.js";
 
 const incidentId = "11111111-1111-4111-8111-111111111111";
 const noteId = "22222222-2222-4222-8222-222222222222";
+const componentId = "55555555-5555-4555-8555-555555555555";
 
 const incidentNamespaceHelp =
   [
@@ -20,7 +24,8 @@ const incidentNamespaceHelp =
     "  list [options]                       List incidents",
     "  get [options] <incident-id>          Show incident detail",
     "  update [options] <incident-id>       Update an incident",
-    "  note [options] <incident-id> <body>  Add or edit incident notes",
+    "  component                            Manage incident components",
+    "  note [options] <incident-id> [body]  Add, edit, or delete incident notes",
     "  help [command]                       display help for command",
   ].join("\n") + "\n";
 
@@ -78,6 +83,7 @@ describe("incident commands", () => {
       ],
       ["incident", "note", incidentId, "Observed", "--json"],
       ["incident", "note", "update", incidentId, noteId, "Edited", "--json"],
+      ["incident", "note", "delete", incidentId, noteId, "--json"],
     ];
 
     for (const args of invocations) {
@@ -101,6 +107,10 @@ describe("incident commands", () => {
       ["POST", `https://api.toughcrowd.dev/api/incidents/${incidentId}/notes`],
       [
         "PATCH",
+        `https://api.toughcrowd.dev/api/incidents/${incidentId}/notes/${noteId}`,
+      ],
+      [
+        "DELETE",
         `https://api.toughcrowd.dev/api/incidents/${incidentId}/notes/${noteId}`,
       ],
     ]);
@@ -170,6 +180,157 @@ describe("incident commands", () => {
     expect(fetch.calls[2].body).toEqual({ title: "Updated" });
   });
 
+  it("sends incident note Markdown beyond the former 10,000-character limit", async () => {
+    const fetch = createIncidentFetch();
+    const body = `# Investigation\n\n${"x".repeat(10_001)}`;
+    const runtime = createAuthenticatedRuntime(fetch);
+
+    expect(
+      await runCli(["incident", "note", incidentId, body, "--json"], runtime),
+    ).toBe(0);
+    expect(fetch.calls).toHaveLength(1);
+    expect(fetch.calls[0]?.body).toEqual({ body });
+    expect(runtime.stderr.output).toBe("");
+  });
+
+  it("reads note creation and updates from UTF-8 files", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "toughcrowd-note-"));
+    const createBody = "# Investigation\n\nCustomer impact confirmed.";
+    const updateBody = "# Correction\n\nImpact started earlier.";
+    const createPath = join(directory, "create.md");
+    const updatePath = join(directory, "update.md");
+
+    try {
+      await Promise.all([
+        writeFile(createPath, createBody, "utf8"),
+        writeFile(updatePath, updateBody, "utf8"),
+      ]);
+      const fetch = createIncidentFetch();
+
+      expect(
+        await runCli(
+          ["incident", "note", incidentId, "--body-file", createPath, "--json"],
+          createAuthenticatedRuntime(fetch),
+        ),
+      ).toBe(0);
+      expect(
+        await runCli(
+          [
+            "incident",
+            "note",
+            "update",
+            incidentId,
+            noteId,
+            "--body-file",
+            updatePath,
+            "--json",
+          ],
+          createAuthenticatedRuntime(fetch),
+        ),
+      ).toBe(0);
+
+      expect(fetch.calls[0]?.body).toEqual({ body: createBody });
+      expect(fetch.calls[1]?.body).toEqual({ body: updateBody });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("sends operational timestamps, replacement impacts, and component management", async () => {
+    const fetch = createIncidentFetch();
+    const impactJson = JSON.stringify([
+      { componentId, condition: "partial_outage" },
+    ]);
+    const invocations = [
+      ["incident", "component", "list", "--json"],
+      [
+        "incident",
+        "component",
+        "create",
+        "Checkout API",
+        "--description",
+        "Customer-facing checkout requests",
+        "--json",
+      ],
+      [
+        "incident",
+        "component",
+        "update",
+        componentId,
+        "--clear-description",
+        "--archive",
+        "--json",
+      ],
+      [
+        "incident",
+        "create",
+        "Checkout is degraded",
+        "--title",
+        "Checkout latency",
+        "--repo",
+        "acme/web",
+        "--started-at",
+        "2026-08-18T12:55:00-07:00",
+        "--detected-at",
+        "2026-08-18T13:00:00-07:00",
+        "--impacts",
+        impactJson,
+        "--json",
+      ],
+      [
+        "incident",
+        "update",
+        incidentId,
+        "--clear-started-at",
+        "--clear-detected-at",
+        "--clear-mitigated-at",
+        "--clear-resolved-at",
+        "--clear-resolution-summary",
+        "--impacts",
+        "[]",
+        "--json",
+      ],
+    ];
+
+    for (const args of invocations) {
+      const runtime = createAuthenticatedRuntime(fetch);
+      expect(await runCli(args, runtime)).toBe(0);
+      expect(runtime.stderr.output).toBe("");
+    }
+
+    expect(fetch.calls.map((call) => [call.method, call.url])).toEqual([
+      ["GET", "https://api.toughcrowd.dev/api/incidents/components"],
+      ["POST", "https://api.toughcrowd.dev/api/incidents/components"],
+      [
+        "PATCH",
+        `https://api.toughcrowd.dev/api/incidents/components/${componentId}`,
+      ],
+      ["POST", "https://api.toughcrowd.dev/api/incidents"],
+      ["PATCH", `https://api.toughcrowd.dev/api/incidents/${incidentId}`],
+    ]);
+    expect(fetch.calls[1].body).toEqual({
+      name: "Checkout API",
+      description: "Customer-facing checkout requests",
+    });
+    expect(fetch.calls[2].body).toEqual({ description: null, archived: true });
+    expect(fetch.calls[3].body).toEqual({
+      summary: "Checkout is degraded",
+      title: "Checkout latency",
+      repositoryFullName: "acme/web",
+      startedAt: "2026-08-18T19:55:00.000Z",
+      detectedAt: "2026-08-18T20:00:00.000Z",
+      impacts: [{ componentId, condition: "partial_outage" }],
+    });
+    expect(fetch.calls[4].body).toEqual({
+      resolutionSummary: null,
+      startedAt: null,
+      detectedAt: null,
+      mitigatedAt: null,
+      resolvedAt: null,
+      impacts: [],
+    });
+  });
+
   it("requires a repository for create before fetching", async () => {
     const fetch = createIncidentFetch();
     const runtime = createAuthenticatedRuntime(fetch);
@@ -206,6 +367,25 @@ describe("incident commands", () => {
     expect(runtime.stderr.output).toBe("");
   });
 
+  it("prints a stable deletion receipt for nested note deletes", async () => {
+    const fetch = createIncidentFetch();
+    const runtime = createAuthenticatedRuntime(fetch);
+
+    expect(
+      await runCli(
+        ["incident", "note", "delete", incidentId, noteId, "--json"],
+        runtime,
+      ),
+    ).toBe(0);
+
+    expect(JSON.parse(runtime.stdout.output)).toEqual({
+      incidentId,
+      noteId,
+      deleted: true,
+    });
+    expect(runtime.stderr.output).toBe("");
+  });
+
   it("rejects invalid choices, pagination, and no-op updates before fetching", async () => {
     const fetch = createIncidentFetch();
     const invalidInvocations = [
@@ -221,9 +401,31 @@ describe("incident commands", () => {
       ["incident", "list", "--limit", "101"],
       ["incident", "get", incidentId, "--cursor", "x".repeat(513)],
       ["incident", "update", incidentId],
+      ["incident", "update", incidentId, "--started-at", "yesterday"],
+      ["incident", "update", incidentId, "--impacts", "{}"],
+      [
+        "incident",
+        "update",
+        incidentId,
+        "--started-at",
+        "2026-08-18T20:00:00.000Z",
+        "--clear-started-at",
+      ],
+      ["incident", "component", "update", componentId],
+      [
+        "incident",
+        "component",
+        "update",
+        componentId,
+        "--archive",
+        "--unarchive",
+      ],
       ["incident", "update", incidentId, "--issue-version", "1"],
       ["incident", "list", "--flag-cache"],
       ["incident", "note", incidentId, " "],
+      ["incident", "note", incidentId],
+      ["incident", "note", incidentId, "Body", "--body-file", "note.md"],
+      ["incident", "note", "update", incidentId, noteId],
       ["incident", "resolve", incidentId],
       ["incident", "retry", incidentId],
       ["incident", "attach-session", incidentId],
@@ -324,6 +526,9 @@ function createIncidentFetch(): FetchLike & { calls: FetchCall[] } {
         new Headers(init.headers).get("idempotency-key") ?? undefined,
     };
     calls.push(call);
+    if (call.method === "DELETE" && call.url.endsWith(`/notes/${noteId}`)) {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
     return Promise.resolve(
       new Response(JSON.stringify(responseFor(call)), {
         status: 200,
@@ -346,6 +551,18 @@ function createStaticFetch(body: unknown, status = 200): FetchLike {
 }
 
 function responseFor(call: FetchCall): unknown {
+  if (call.url.endsWith("/api/incidents/components")) {
+    return call.method === "GET"
+      ? { components: [createComponent()] }
+      : { component: createComponent() };
+  }
+  if (call.url.includes("/api/incidents/components/")) {
+    return {
+      component: createComponent({
+        archivedAt: "2026-08-19T20:00:00.000Z",
+      }),
+    };
+  }
   if (call.url.endsWith(`/notes/${noteId}`)) {
     return { note: createNote({ body: "Edited" }) };
   }
@@ -371,7 +588,25 @@ function createIncident() {
     summary: "Checkout is down",
     severity: "p1",
     state: "active",
+    startedAt: "2026-08-18T19:55:00.000Z",
+    detectedAt: "2026-08-18T20:00:00.000Z",
+    mitigatedAt: null,
     resolutionSummary: null,
+    impacts: [
+      {
+        id: "44444444-4444-4444-8444-444444444444",
+        component: {
+          id: "55555555-5555-4555-8555-555555555555",
+          name: "Checkout API",
+        },
+        condition: "unavailable",
+      },
+    ],
+    createdBy: {
+      id: "33333333-3333-4333-8333-333333333333",
+      name: "Ada",
+    },
+    updatedBy: null,
     createdAt: "2026-08-18T20:01:02.000Z",
     updatedAt: "2026-08-18T20:02:02.000Z",
     resolvedAt: null,
@@ -387,6 +622,19 @@ function createNote(overrides: Record<string, unknown> = {}) {
     updatedAt: "2026-08-18T20:03:02.000Z",
     createdBy: null,
     updatedBy: { id: "33333333-3333-4333-8333-333333333333", name: "Ada" },
+    ...overrides,
+  };
+}
+
+function createComponent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: componentId,
+    organizationId: "77777777-7777-4777-8777-777777777777",
+    name: "Checkout API",
+    description: "Customer-facing checkout requests",
+    archivedAt: null,
+    createdAt: "2026-08-18T20:01:02.000Z",
+    updatedAt: "2026-08-18T20:02:02.000Z",
     ...overrides,
   };
 }

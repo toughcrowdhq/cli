@@ -1,5 +1,8 @@
 import type {
   Incident,
+  IncidentComponent,
+  IncidentComponentList,
+  IncidentComponentResponse,
   IncidentDetail,
   IncidentList,
   IncidentNote,
@@ -16,6 +19,13 @@ const columnWidths = {
   repository: 28,
   title: 44,
   updatedAt: 24,
+} as const;
+
+const componentColumnWidths = {
+  id: 36,
+  status: 8,
+  name: 28,
+  description: 48,
 } as const;
 
 export function printIncidentList(
@@ -82,6 +92,59 @@ export function printIncidentNoteResponse(
   printIncidentNote(stdout, result.note);
 }
 
+export function printIncidentNoteDeletion(
+  stdout: Writable,
+  incidentId: string,
+  noteId: string,
+  json: boolean,
+): void {
+  if (json) return printJson(stdout, { incidentId, noteId, deleted: true });
+  stdout.write("Incident note deleted\n");
+  stdout.write(`Incident ID: ${incidentId}\n`);
+  stdout.write(`Note ID: ${noteId}\n`);
+}
+
+export function printIncidentComponentList(
+  stdout: Writable,
+  result: IncidentComponentList,
+  json: boolean,
+): void {
+  if (json) return printJson(stdout, result);
+  if (result.components.length === 0) {
+    stdout.write("No incident components found.\n");
+    return;
+  }
+  stdout.write(
+    formatComponentRow({
+      id: "ID",
+      status: "STATUS",
+      name: "NAME",
+      description: "DESCRIPTION",
+    }),
+  );
+  for (const component of result.components) {
+    stdout.write(
+      formatComponentRow({
+        id: component.id,
+        status: component.archivedAt === null ? "active" : "archived",
+        name: component.name,
+        description: component.description ?? "(none)",
+      }),
+    );
+  }
+}
+
+export function printIncidentComponentResponse(
+  stdout: Writable,
+  result: IncidentComponentResponse,
+  action: "created" | "updated",
+  json: boolean,
+): void {
+  if (json) return printJson(stdout, result);
+  stdout.write(`Incident component ${action}\n`);
+  printIncidentComponentFields(stdout, result.component);
+}
+
 function printJson(stdout: Writable, value: unknown): void {
   stdout.write(`${JSON.stringify(value)}\n`);
 }
@@ -95,14 +158,46 @@ function printIncidentFields(stdout: Writable, incident: Incident): void {
   );
   stdout.write(`Title: ${formatValue(incident.title, 300)}\n`);
   stdout.write(`Summary: ${formatValue(incident.summary, 10_000)}\n`);
+  stdout.write(`Started: ${incident.startedAt ?? "(none)"}\n`);
+  stdout.write(`Detected: ${incident.detectedAt ?? "(none)"}\n`);
+  stdout.write(`Mitigated: ${incident.mitigatedAt ?? "(none)"}\n`);
   stdout.write(
     `Resolution: ${formatValue(incident.resolutionSummary ?? "(none)", 10_000)}\n`,
   );
   stdout.write(`Created: ${incident.createdAt}\n`);
   stdout.write(`Updated: ${incident.updatedAt}\n`);
   stdout.write(`Resolved: ${incident.resolvedAt ?? "(none)"}\n`);
-  stdout.write(`Created by: ${formatUserId(incident.createdByUserId)}\n`);
-  stdout.write(`Updated by: ${formatUserId(incident.updatedByUserId)}\n`);
+  stdout.write(`Impacts: ${incident.impacts.length}\n`);
+  for (const impact of incident.impacts) {
+    const component = impact.component;
+    stdout.write(
+      `Impact: ${
+        component === null
+          ? "System"
+          : `${formatValue(component.name, 120)} (${component.id})`
+      } - ${impact.condition}\n`,
+    );
+  }
+  stdout.write(
+    `Created by: ${formatAttribution(incident.createdBy, incident.createdByUserId)}\n`,
+  );
+  stdout.write(
+    `Updated by: ${formatAttribution(incident.updatedBy, incident.updatedByUserId)}\n`,
+  );
+}
+
+function printIncidentComponentFields(
+  stdout: Writable,
+  component: IncidentComponent,
+): void {
+  stdout.write(`ID: ${component.id}\n`);
+  stdout.write(`Name: ${formatValue(component.name, 120)}\n`);
+  stdout.write(
+    `Description: ${formatValue(component.description ?? "(none)", 1_000)}\n`,
+  );
+  stdout.write(`Created: ${component.createdAt}\n`);
+  stdout.write(`Updated: ${component.updatedAt}\n`);
+  stdout.write(`Archived: ${component.archivedAt ?? "(none)"}\n`);
 }
 
 function printIncidentNote(stdout: Writable, note: IncidentNote): void {
@@ -135,6 +230,20 @@ function formatRow(values: Record<keyof typeof columnWidths, string>): string {
   );
 }
 
+function formatComponentRow(
+  values: Record<keyof typeof componentColumnWidths, string>,
+): string {
+  return (
+    (
+      Object.keys(componentColumnWidths) as Array<
+        keyof typeof componentColumnWidths
+      >
+    )
+      .map((key) => formatColumn(values[key], componentColumnWidths[key]))
+      .join("  ") + "\n"
+  );
+}
+
 function formatColumn(value: string, width: number): string {
   const safe = formatValue(value, width);
   const bounded =
@@ -147,8 +256,11 @@ function formatActor(actor: IncidentNote["createdBy"]): string {
   return `${formatTerminalValue(actor.name)} (${actor.id})`;
 }
 
-function formatUserId(userId: string | null): string {
-  return userId ?? "(unknown)";
+function formatAttribution(
+  actor: Incident["createdBy"],
+  userId: string | null,
+): string {
+  return actor === null ? (userId ?? "(unknown)") : formatActor(actor);
 }
 
 function formatValue(value: string, maximumLength: number): string {

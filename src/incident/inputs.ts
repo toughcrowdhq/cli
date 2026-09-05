@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { parseGitHubRepositoryOrigin } from "../session/inputs.js";
 import { IncidentCommandError } from "./errors.js";
 import {
@@ -104,6 +105,14 @@ export function readRequiredIncidentNoteBody(value: string): string {
   return body;
 }
 
+export async function readIncidentNoteBodyFile(path: string): Promise<string> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    throw new IncidentCommandError("Note body file could not be read.", 2);
+  }
+}
+
 export function readComponentName(value: string): string {
   return readRequiredText(value, "Component name", maximumComponentNameLength);
 }
@@ -131,16 +140,52 @@ export function readOptionalOperationalTimestamp(
   name: string,
 ): string | null | undefined {
   if (value == null) return value;
-  if (
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(
+  const match =
+    /^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/u.exec(
       value,
-    )
+    );
+  if (match == null) {
+    throw new IncidentCommandError(
+      `${name} must be an ISO 8601 timestamp with an offset.`,
+      2,
+    );
+  }
+
+  const [
+    ,
+    monthText,
+    dayText,
+    hourText,
+    minuteText,
+    secondText,
+    offsetHourText,
+    offsetMinuteText,
+  ] = match;
+  const year = Number(value.slice(0, 4));
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const offsetHour = offsetHourText == null ? 0 : Number(offsetHourText);
+  const offsetMinute = offsetMinuteText == null ? 0 : Number(offsetMinuteText);
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth(year, month) ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHour > 23 ||
+    offsetMinute > 59
   ) {
     throw new IncidentCommandError(
       `${name} must be an ISO 8601 timestamp with an offset.`,
       2,
     );
   }
+
   const timestamp = new Date(value);
   if (Number.isNaN(timestamp.getTime())) {
     throw new IncidentCommandError(
@@ -149,6 +194,13 @@ export function readOptionalOperationalTimestamp(
     );
   }
   return timestamp.toISOString();
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) {
+    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
+  }
+  return month === 4 || month === 6 || month === 9 || month === 11 ? 30 : 31;
 }
 
 export function readOptionalImpacts(

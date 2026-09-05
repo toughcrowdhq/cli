@@ -21,7 +21,7 @@ import {
   type IncidentSeverity,
   type IncidentState,
 } from "./types.js";
-import { readCursor } from "./inputs.js";
+import { readCursor, readIncidentNoteBodyFile } from "./inputs.js";
 
 export function createIncidentCommandGroup(
   runtime: CreateIncidentRuntime,
@@ -407,47 +407,60 @@ function createComponentUpdateCommand(runtime: CreateIncidentRuntime): Command {
 }
 
 function createNoteCommand(runtime: CreateIncidentRuntime): Command {
-  return command("note", "Add, edit, or delete incident notes")
+  const noteCommand = command("note", "Add, edit, or delete incident notes")
     .argument("<incident-id>", "incident ID", parseIncidentId)
-    .argument("<body>", "note body")
+    .argument("[body]", "note body")
+    .option("--body-file <path>", "read note body from a UTF-8 file")
     .option("--json", "print machine-readable JSON")
     .action(
-      async (incidentId: string, body: string, options: { json?: boolean }) => {
+      async (
+        incidentId: string,
+        body: string | undefined,
+        options: { bodyFile?: string; json?: boolean },
+      ) => {
         await createIncidentNoteCommand(runtime, {
           incidentId,
-          body,
+          body: await resolveNoteBody(noteCommand, body, options.bodyFile),
           json: options.json === true,
         });
       },
     )
     .addCommand(createNoteUpdateCommand(runtime))
     .addCommand(createNoteDeleteCommand(runtime));
+  return noteCommand;
 }
 
 function createNoteUpdateCommand(runtime: CreateIncidentRuntime): Command {
-  return command("update", "Edit an incident note")
+  const updateCommand = command("update", "Edit an incident note")
     .argument("<incident-id>", "incident ID", parseIncidentId)
     .argument("<note-id>", "note ID", parseIncidentId)
-    .argument("<body>", "note body")
+    .argument("[body]", "note body")
+    .option("--body-file <path>", "read note body from a UTF-8 file")
     .option("--json", "print machine-readable JSON")
     .action(
       async (
         incidentId: string,
         noteId: string,
-        body: string,
-        options: { json?: boolean },
+        body: string | undefined,
+        options: { bodyFile?: string; json?: boolean },
         actionCommand: Command,
       ) => {
         await updateIncidentNoteCommand(runtime, {
           incidentId,
           noteId,
-          body,
+          body: await resolveNoteBody(
+            updateCommand,
+            body,
+            options.bodyFile ??
+              actionCommand.parent?.opts<{ bodyFile?: string }>().bodyFile,
+          ),
           json:
             options.json === true ||
             actionCommand.parent?.opts<{ json?: boolean }>().json === true,
         });
       },
     );
+  return updateCommand;
 }
 
 function createNoteDeleteCommand(runtime: CreateIncidentRuntime): Command {
@@ -496,6 +509,22 @@ function parseIncidentId(value: string): string {
     throw new InvalidArgumentError("must be a UUID");
   }
   return value;
+}
+
+async function resolveNoteBody(
+  optionCommand: Command,
+  body: string | undefined,
+  bodyFile: string | undefined,
+): Promise<string> {
+  if (body !== undefined && bodyFile !== undefined) {
+    optionCommand.error("error: <body> and --body-file cannot be combined");
+  }
+  if (body === undefined && bodyFile === undefined) {
+    optionCommand.error(
+      "error: either <body> or --body-file <path> is required",
+    );
+  }
+  return bodyFile === undefined ? body! : readIncidentNoteBodyFile(bodyFile);
 }
 
 function resolveNullableOption(

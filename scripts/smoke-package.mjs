@@ -199,6 +199,18 @@ try {
     ],
     { encoding: "utf8" },
   );
+  const incidentNoteSmokeOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(
+        packageDirectory,
+        "scripts/fixtures/package-smoke-incident-note.mjs",
+      ),
+      executable,
+      metadata.version,
+    ],
+    { encoding: "utf8" },
+  );
 
   assert(
     versionOutput === `${metadata.version}\n`,
@@ -270,7 +282,7 @@ Commands:
         "  create [options] <summary>           Create an incident\n",
       ) &&
       incidentHelpOutput.includes(
-        "  note [options] <incident-id> <body>  Add, edit, or delete incident notes\n",
+        "  note [options] <incident-id> [body]  Add, edit, or delete incident notes\n",
       ) &&
       incidentCreateHelpOutput.includes(
         "Usage: toughcrowd incident create [options] <summary>\n",
@@ -317,6 +329,10 @@ Commands:
   assert(
     deployReportSmokeOutput === "Verified installed deploy report\n",
     "installed CLI failed the authenticated deploy-report smoke test",
+  );
+  assert(
+    incidentNoteSmokeOutput === "Verified installed 256 KiB incident note\n",
+    "installed CLI failed the 256 KiB incident-note smoke test",
   );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {

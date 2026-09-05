@@ -105,6 +105,15 @@ describe("richer incident inputs", () => {
     expect(() =>
       readOptionalOperationalTimestamp("2026-08-18 12:55", "Started time"),
     ).toThrow("Started time must be an ISO 8601 timestamp with an offset.");
+    expect(() =>
+      readOptionalOperationalTimestamp("2026-02-30T12:00:00Z", "Started time"),
+    ).toThrow("Started time must be an ISO 8601 timestamp with an offset.");
+    expect(() =>
+      readOptionalOperationalTimestamp(
+        "2026-04-31T12:00:00+00:00",
+        "Started time",
+      ),
+    ).toThrow("Started time must be an ISO 8601 timestamp with an offset.");
   });
 
   it("validates complete impact replacements", () => {

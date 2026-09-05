@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runCli, type CliRuntime } from "../cli.js";
 import type { CredentialStore } from "../auth/credentials.js";
 import type { FetchLike } from "../api/request.js";
@@ -22,7 +25,7 @@ const incidentNamespaceHelp =
     "  get [options] <incident-id>          Show incident detail",
     "  update [options] <incident-id>       Update an incident",
     "  component                            Manage incident components",
-    "  note [options] <incident-id> <body>  Add, edit, or delete incident notes",
+    "  note [options] <incident-id> [body]  Add, edit, or delete incident notes",
     "  help [command]                       display help for command",
   ].join("\n") + "\n";
 
@@ -188,6 +191,49 @@ describe("incident commands", () => {
     expect(fetch.calls).toHaveLength(1);
     expect(fetch.calls[0]?.body).toEqual({ body });
     expect(runtime.stderr.output).toBe("");
+  });
+
+  it("reads note creation and updates from UTF-8 files", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "toughcrowd-note-"));
+    const createBody = "# Investigation\n\nCustomer impact confirmed.";
+    const updateBody = "# Correction\n\nImpact started earlier.";
+    const createPath = join(directory, "create.md");
+    const updatePath = join(directory, "update.md");
+
+    try {
+      await Promise.all([
+        writeFile(createPath, createBody, "utf8"),
+        writeFile(updatePath, updateBody, "utf8"),
+      ]);
+      const fetch = createIncidentFetch();
+
+      expect(
+        await runCli(
+          ["incident", "note", incidentId, "--body-file", createPath, "--json"],
+          createAuthenticatedRuntime(fetch),
+        ),
+      ).toBe(0);
+      expect(
+        await runCli(
+          [
+            "incident",
+            "note",
+            "update",
+            incidentId,
+            noteId,
+            "--body-file",
+            updatePath,
+            "--json",
+          ],
+          createAuthenticatedRuntime(fetch),
+        ),
+      ).toBe(0);
+
+      expect(fetch.calls[0]?.body).toEqual({ body: createBody });
+      expect(fetch.calls[1]?.body).toEqual({ body: updateBody });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("sends operational timestamps, replacement impacts, and component management", async () => {
@@ -377,6 +423,9 @@ describe("incident commands", () => {
       ["incident", "update", incidentId, "--issue-version", "1"],
       ["incident", "list", "--flag-cache"],
       ["incident", "note", incidentId, " "],
+      ["incident", "note", incidentId],
+      ["incident", "note", incidentId, "Body", "--body-file", "note.md"],
+      ["incident", "note", "update", incidentId, noteId],
       ["incident", "resolve", incidentId],
       ["incident", "retry", incidentId],
       ["incident", "attach-session", incidentId],

@@ -309,7 +309,9 @@ toughcrowd incident update <incident-id> \
   --resolved-at 2026-09-02T10:15:00-07:00
 toughcrowd incident update <incident-id> --state active
 toughcrowd incident note <incident-id> "First customer report arrived at 20:03Z."
+toughcrowd incident note <incident-id> --body-file incident-report.md
 toughcrowd incident note update <incident-id> <note-id> "Corrected timestamp."
+toughcrowd incident note update <incident-id> <note-id> --body-file corrected-report.md
 toughcrowd incident note delete <incident-id> <note-id>
 toughcrowd incident component list
 toughcrowd incident component create "Checkout API" \
@@ -354,8 +356,9 @@ Every incident operation accepts `--json`. Human output strips terminal control
 characters and prints lifecycle state, severity, operational timestamps,
 component impacts, attribution, and note bodies as server-provided incident
 content. Incident notes support report-grade Markdown up to 256 KiB each when
-encoded as UTF-8; summaries and resolution summaries remain limited to 10,000
-characters. The service permits up to 10 MiB of notes per incident.
+encoded as UTF-8; pass large notes with `--body-file <path>` rather than a
+positional argument. Summaries and resolution summaries remain limited to
+10,000 characters. The service permits up to 10 MiB of notes per incident.
 `incident get` combines the current incident detail with one bounded
 chronological notes page and prints `nextCursor` when more notes are available.
 Pass `--limit <count>` from 1 to 100 and return opaque cursors unchanged with

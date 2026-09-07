@@ -1,5 +1,25 @@
 # @toughcrowd/cli
 
+## 0.7.0
+
+### Minor Changes
+
+- cda788b: Add append-only Issue comment creation and display comments in Issue detail.
+- af5ba25: Add issue type and priority support to issue creation, updates, and output.
+- 0bf6529: Add machine-local Agent Profile, model, and reasoning-effort session defaults.
+- 5841070: Add the `toughcrowd incident` command group for creating, listing, inspecting,
+  updating, resolving, reopening, and annotating Incident Repository records.
+- f7f9b9b: Support operational timestamps, component impacts, actor attribution,
+  report-grade Markdown notes up to 256 KiB, note deletion, and incident component
+  management throughout the `toughcrowd incident` workflow.
+
+### Patch Changes
+
+- 862023a: Require a repository before creating an incident so missing repository context
+  produces a local usage error instead of an invalid API request.
+- ce5f032: Keep issue commands compatible with API responses that no longer include the
+  retired severity field.
+
 ## 0.6.0
 
 ### Minor Changes

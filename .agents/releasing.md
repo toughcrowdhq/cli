@@ -30,6 +30,29 @@ first package version is the exception: npm cannot configure a trusted
 publisher or staged publish for a package that does not yet exist, so `0.1.0`
 must be bootstrapped interactively from its exact local tag with maintainer 2FA.
 
+## Deployment Reporting
+
+After npm publishing succeeds (or the version already exists), the workflow
+reports stable releases on `latest` to Tough Crowd using the CLI artifact built
+and tested in that run. Prereleases on `next` do not report production
+deployments. GitHub Actions supplies the repository, release commit SHA, and
+workflow run context automatically.
+
+Configure the `TOUGHCROWD_API_KEY` Actions secret for the CLI repository or its
+`npm-production` environment. The key must belong to a Tough Crowd organization
+with access to the CLI repository through its active GitHub integration.
+
+Reconciliation runs asynchronously after the report is accepted. Merged
+sessions whose merge commits are included in the release then display as
+Deployed, including previously unreleased work. Sessions
+outside the released history remain unchanged.
+
+A missing key or failed report fails the workflow before GitHub Release
+creation, even though the npm version is already published. Correct the secret
+or reporting failure and rerun the workflow for the same tag: it skips the
+existing npm version and retries reporting before creating the GitHub Release.
+An accepted report does not mean asynchronous reconciliation has completed.
+
 ## Supported Release Lines
 
 Before 1.0, the current minor line is supported. Older 0.x minor lines are not

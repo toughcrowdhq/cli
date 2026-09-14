@@ -64,6 +64,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   config          Manage machine-local Tough Crowd preferences
   agent-profile   Discover executable Agent Profiles
+  chatgpt         Work with ChatGPT authorization
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
   incident        Work with Tough Crowd incidents
@@ -112,6 +113,20 @@ TOUGHCROWD_API_KEY=tc_... toughcrowd auth status
 
 Environment credentials take precedence over stored credentials and are never
 persisted. Override the API origin with `TOUGHCROWD_API_ORIGIN`.
+
+## ChatGPT authorization relay
+
+When the Tough Crowd web app asks for a ChatGPT relay, run the exact one-time
+command it shows, for example:
+
+```sh
+npx @toughcrowd/cli@latest chatgpt relay 7K3M-PQ9D-W2FX
+```
+
+The relay does not require Tough Crowd CLI authentication. It listens only on
+`localhost:1455`, reports that it is ready using the short-lived code, and
+redirects the browser's ChatGPT callback back to Tough Crowd. It never receives
+or stores the resulting ChatGPT credentials.
 
 ## Sessions
 

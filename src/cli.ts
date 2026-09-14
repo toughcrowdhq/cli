@@ -50,6 +50,12 @@ import {
   type ConfigKey,
 } from "./config.js";
 import { listAgentProfiles, validateSelection } from "./agent-profile.js";
+import { resolveAuthOrigin } from "./auth/origins.js";
+import {
+  ChatGptRelayError,
+  relayChatGptAuthorization,
+} from "./chatgpt/relay.js";
+import type { ChatGptRelayListenerFactory } from "./chatgpt/relay-listener.js";
 
 export interface CliWritable {
   write(value: string): unknown;
@@ -66,6 +72,7 @@ export interface CliRuntime {
   credentialStore?: CredentialStore;
   createAuthorizationSecrets?(): AuthorizationSecrets;
   bindLoopbackListener?: LoopbackListenerFactory;
+  bindChatGptRelayListener?: ChatGptRelayListenerFactory;
   openUrl?(url: string): Promise<boolean>;
   readGitOrigin?(): Promise<string | null>;
   createIdempotencyKey?(): string;
@@ -131,6 +138,11 @@ export async function runCli(
       return error.exitCode;
     }
 
+    if (error instanceof ChatGptRelayError) {
+      runtime.stderr.write(`${error.message}\n`);
+      return error.exitCode;
+    }
+
     if (error instanceof ConfigError) {
       runtime.stderr.write(`${error.message}\n`);
       return 1;
@@ -173,6 +185,7 @@ function createRootProgram(runtime: CliRuntime): Command {
 
   program.addCommand(createConfigCommand(runtime));
   program.addCommand(createAgentProfileCommand(runtime));
+  program.addCommand(createChatGptCommand(runtime));
 
   program
     .command("session")
@@ -216,6 +229,45 @@ function createRootProgram(runtime: CliRuntime): Command {
   );
 
   return program;
+}
+
+function createChatGptCommand(runtime: CliRuntime): Command {
+  const relay = new Command("relay")
+    .description("Relay ChatGPT authorization back to Tough Crowd")
+    .argument("<code>", "one-time relay code", parseChatGptRelayCode)
+    .allowExcessArguments(false)
+    .allowUnknownOption(false)
+    .action(async (code: string) => {
+      await relayChatGptAuthorization(code, {
+        stdout: runtime.stdout,
+        stderr: runtime.stderr,
+        version: runtime.version,
+        signal: runtime.signal,
+        origin: resolveAuthOrigin(runtime.env),
+        fetch: runtime.fetch,
+        timers: runtime.timers,
+        bindListener: runtime.bindChatGptRelayListener,
+      });
+    });
+
+  return configureCommandTree(
+    new Command("chatgpt")
+      .description("Work with ChatGPT authorization")
+      .addCommand(relay),
+    runtime,
+  );
+}
+
+function parseChatGptRelayCode(value: string): string {
+  const normalized = value.toUpperCase();
+  if (
+    !/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/.test(
+      normalized,
+    )
+  ) {
+    throw new InvalidArgumentError("must look like 7K3M-PQ9D-W2FX");
+  }
+  return normalized;
 }
 
 function createSessionListCommand(runtime: CliRuntime): Command {

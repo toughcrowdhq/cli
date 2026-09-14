@@ -7,6 +7,10 @@ import {
   type LoopbackCallback,
   type LoopbackListenerFactory,
 } from "./auth/loopback.js";
+import type {
+  ChatGptRelayListener,
+  ChatGptRelayListenerFactory,
+} from "./chatgpt/relay-listener.js";
 
 const authorizationUrl =
   "https://app.toughcrowd.dev/cli/authorize#request=browser-request";
@@ -30,6 +34,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   config          Manage machine-local Tough Crowd preferences
   agent-profile   Discover executable Agent Profiles
+  chatgpt         Work with ChatGPT authorization
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
   incident        Work with Tough Crowd incidents
@@ -96,6 +101,163 @@ describe("Tough Crowd CLI", () => {
     expect(exitCode).toBe(2);
     expect(runtime.stdout.output).toBe("");
     expect(runtime.stderr.output).toBe("error: unknown command 'extra'\n");
+  });
+
+  it("runs the unauthenticated ChatGPT relay with the browser pairing code", async () => {
+    const relayUrls: string[] = [];
+    let closeCalls = 0;
+    const fetch = createFetch((url, init) => {
+      expect(new Headers(init.headers).get("authorization")).toBeNull();
+      if (typeof init.body !== "string") {
+        throw new Error("Expected the relay request to have a JSON body.");
+      }
+      expect(JSON.parse(init.body)).toEqual({ code: "7K3M-PQ9D-W2FX" });
+      expect(url.toString()).toBe(
+        "https://api.toughcrowd.dev/api/model-credential-authorizations/relay/ready",
+      );
+      return new Response(
+        JSON.stringify({
+          relayUrl:
+            "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user",
+          state: "chatgpt-oauth-state",
+          expiresAt: "2026-09-14T20:10:00.000Z",
+          heartbeatIntervalSeconds: 5,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    const runtime = createRuntime({
+      fetch,
+      bindChatGptRelayListener: () =>
+        Promise.resolve({
+          callbackUrl: "http://localhost:1455/auth/callback",
+          setRelayUrl: (url, state) => relayUrls.push(`${url}#state=${state}`),
+          waitForRedirect: () => Promise.resolve(),
+          close: () => {
+            closeCalls += 1;
+            return Promise.resolve();
+          },
+        }),
+    });
+
+    const exitCode = await runCli(
+      ["chatgpt", "relay", "7k3m-pq9d-w2fx"],
+      runtime,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(runtime.stdout.output).toBe(
+      "ChatGPT relay running at http://localhost:1455/auth/callback\n" +
+        "Return to your browser and choose Authorize with ChatGPT.\n" +
+        "ChatGPT authorization returned to Tough Crowd. Relay completed.\n",
+    );
+    expect(runtime.stderr.output).toBe("");
+    expect(relayUrls).toEqual([
+      "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user#state=chatgpt-oauth-state",
+    ]);
+    expect(closeCalls).toBe(1);
+  });
+
+  it("rejects a malformed ChatGPT relay code before starting a listener", async () => {
+    const runtime = createRuntime();
+
+    const exitCode = await runCli(["chatgpt", "relay", "not-a-code"], runtime);
+
+    expect(exitCode).toBe(2);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toContain("must look like 7K3M-PQ9D-W2FX");
+  });
+
+  it("stops the ChatGPT relay cleanly when interrupted", async () => {
+    const controller = new AbortController();
+    let closeCalls = 0;
+    const fetch = createFetch(
+      () =>
+        new Response(
+          JSON.stringify({
+            relayUrl:
+              "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user",
+            state: "chatgpt-oauth-state",
+            expiresAt: "2026-09-14T20:10:00.000Z",
+            heartbeatIntervalSeconds: 5,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const runtime = createRuntime({
+      signal: controller.signal,
+      fetch,
+      bindChatGptRelayListener: () =>
+        Promise.resolve({
+          callbackUrl: "http://localhost:1455/auth/callback",
+          setRelayUrl: () => {},
+          waitForRedirect: () => {
+            controller.abort();
+            return new Promise<void>(() => undefined);
+          },
+          close: () => {
+            closeCalls += 1;
+            return Promise.resolve();
+          },
+        }),
+    });
+
+    const exitCode = await runCli(
+      ["chatgpt", "relay", "7K3M-PQ9D-W2FX"],
+      runtime,
+    );
+
+    expect(exitCode).toBe(130);
+    expect(runtime.stdout.output).toBe(
+      "ChatGPT relay running at http://localhost:1455/auth/callback\n" +
+        "Return to your browser and choose Authorize with ChatGPT.\n",
+    );
+    expect(runtime.stderr.output).toBe("");
+    expect(closeCalls).toBe(1);
+  });
+
+  it("stops the ChatGPT relay when interrupted while the listener is binding", async () => {
+    const controller = new AbortController();
+    let fetchCalls = 0;
+    let closeCalls = 0;
+    let resolveBinding!: (listener: ChatGptRelayListener) => void;
+    let markBindingStarted!: () => void;
+    const bindingStarted = new Promise<void>((resolve) => {
+      markBindingStarted = resolve;
+    });
+    const binding = new Promise<ChatGptRelayListener>((resolve) => {
+      resolveBinding = resolve;
+    });
+    const runtime = createRuntime({
+      signal: controller.signal,
+      fetch: createFetch(() => {
+        fetchCalls += 1;
+        throw new Error("The ready request must not start after interruption.");
+      }),
+      bindChatGptRelayListener: () => {
+        markBindingStarted();
+        return binding;
+      },
+    });
+
+    const running = runCli(["chatgpt", "relay", "7K3M-PQ9D-W2FX"], runtime);
+    await bindingStarted;
+    controller.abort();
+    resolveBinding({
+      callbackUrl: "http://localhost:1455/auth/callback",
+      setRelayUrl: () => {},
+      waitForRedirect: () => new Promise<void>(() => undefined),
+      close: () => {
+        closeCalls += 1;
+        return Promise.resolve();
+      },
+    });
+
+    await expect(running).resolves.toBe(130);
+    expect(fetchCalls).toBe(0);
+    expect(closeCalls).toBe(1);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toBe("");
   });
 
   it("can run repeatedly with independent injected streams", async () => {
@@ -652,6 +814,7 @@ function createRuntime(
       | "fetch"
       | "createAuthorizationSecrets"
       | "bindLoopbackListener"
+      | "bindChatGptRelayListener"
       | "openUrl"
     >
   > = {},
@@ -675,9 +838,19 @@ function createRuntime(
       })),
     bindLoopbackListener:
       overrides.bindLoopbackListener ?? createLoopbackHarness().factory,
+    bindChatGptRelayListener:
+      overrides.bindChatGptRelayListener ?? createChatGptRelayListener,
     openUrl: overrides.openUrl ?? (() => Promise.resolve(true)),
   };
 }
+
+const createChatGptRelayListener: ChatGptRelayListenerFactory = () =>
+  Promise.resolve({
+    callbackUrl: "http://localhost:1455/auth/callback",
+    setRelayUrl: () => {},
+    waitForRedirect: () => Promise.resolve(),
+    close: () => Promise.resolve(),
+  });
 
 function createWritable(): CapturedWritable {
   return {

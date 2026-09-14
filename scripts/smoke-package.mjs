@@ -229,6 +229,7 @@ Commands:
   auth            Manage Tough Crowd authentication
   config          Manage machine-local Tough Crowd preferences
   agent-profile   Discover executable Agent Profiles
+  chatgpt         Work with ChatGPT authorization
   session         Work with Tough Crowd sessions
   issue           Work with Tough Crowd issues
   incident        Work with Tough Crowd incidents

@@ -8,6 +8,7 @@ import {
 import { defaultApiOrigin } from "../api/origin.js";
 import {
   bindChatGptRelayListener,
+  type ChatGptRelayListener,
   type ChatGptRelayListenerFactory,
 } from "./relay-listener.js";
 
@@ -32,6 +33,7 @@ export type ChatGptRelayRuntime = {
 
 type RelayReadyResponse = {
   relayUrl: string;
+  state: string;
   expiresAt: string;
   heartbeatIntervalSeconds: number;
 };
@@ -40,23 +42,26 @@ export async function relayChatGptAuthorization(
   code: string,
   runtime: ChatGptRelayRuntime,
 ): Promise<void> {
-  let listener;
-  let listenerClosed = false;
-  try {
-    listener = await (runtime.bindListener ?? bindChatGptRelayListener)();
-  } catch (error) {
-    throw new ChatGptRelayError(
-      error instanceof Error && "code" in error && error.code === "EADDRINUSE"
-        ? "Port 1455 is already in use. Stop the other process and run the relay again."
-        : "Could not start the ChatGPT relay on localhost:1455.",
-    );
-  }
-
   const controller = new AbortController();
   const abort = () => controller.abort();
   runtime.signal.addEventListener("abort", abort, { once: true });
+  if (runtime.signal.aborted) abort();
 
+  let listener: ChatGptRelayListener | undefined;
+  let listenerClosed = false;
   try {
+    if (controller.signal.aborted) return;
+    try {
+      listener = await (runtime.bindListener ?? bindChatGptRelayListener)();
+    } catch (error) {
+      throw new ChatGptRelayError(
+        error instanceof Error && "code" in error && error.code === "EADDRINUSE"
+          ? "Port 1455 is already in use. Stop the other process and run the relay again."
+          : "Could not start the ChatGPT relay on localhost:1455.",
+      );
+    }
+    if (controller.signal.aborted) return;
+
     const ready = await requestJson({
       origin: runtime.origin ?? defaultApiOrigin,
       method: "POST",
@@ -68,7 +73,7 @@ export async function relayChatGptAuthorization(
       metadata: { cliVersion: runtime.version },
       decode: decodeRelayReadyResponse,
     });
-    listener.setRelayUrl(ready.relayUrl);
+    listener.setRelayUrl(ready.relayUrl, ready.state);
 
     runtime.stdout.write(`ChatGPT relay running at ${listener.callbackUrl}\n`);
     runtime.stdout.write(
@@ -107,7 +112,9 @@ export async function relayChatGptAuthorization(
   } finally {
     controller.abort();
     runtime.signal.removeEventListener("abort", abort);
-    if (!listenerClosed) await listener.close().catch(() => undefined);
+    if (listener && !listenerClosed) {
+      await listener.close().catch(() => undefined);
+    }
   }
 }
 
@@ -163,10 +170,13 @@ function delay(
 function decodeRelayReadyResponse(value: unknown): RelayReadyResponse {
   if (!isRecord(value)) throw new TypeError("Relay response must be an object");
   const relayUrl = value.relayUrl;
+  const state = value.state;
   const expiresAt = value.expiresAt;
   const heartbeatIntervalSeconds = value.heartbeatIntervalSeconds;
   if (
     typeof relayUrl !== "string" ||
+    typeof state !== "string" ||
+    state.length === 0 ||
     typeof expiresAt !== "string" ||
     typeof heartbeatIntervalSeconds !== "number" ||
     !Number.isInteger(heartbeatIntervalSeconds) ||
@@ -174,7 +184,7 @@ function decodeRelayReadyResponse(value: unknown): RelayReadyResponse {
   ) {
     throw new TypeError("Relay response fields are invalid");
   }
-  return { relayUrl, expiresAt, heartbeatIntervalSeconds };
+  return { relayUrl, state, expiresAt, heartbeatIntervalSeconds };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

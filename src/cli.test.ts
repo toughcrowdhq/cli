@@ -7,7 +7,10 @@ import {
   type LoopbackCallback,
   type LoopbackListenerFactory,
 } from "./auth/loopback.js";
-import type { ChatGptRelayListenerFactory } from "./chatgpt/relay-listener.js";
+import type {
+  ChatGptRelayListener,
+  ChatGptRelayListenerFactory,
+} from "./chatgpt/relay-listener.js";
 
 const authorizationUrl =
   "https://app.toughcrowd.dev/cli/authorize#request=browser-request";
@@ -116,6 +119,7 @@ describe("Tough Crowd CLI", () => {
         JSON.stringify({
           relayUrl:
             "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user",
+          state: "chatgpt-oauth-state",
           expiresAt: "2026-09-14T20:10:00.000Z",
           heartbeatIntervalSeconds: 5,
         }),
@@ -127,7 +131,7 @@ describe("Tough Crowd CLI", () => {
       bindChatGptRelayListener: () =>
         Promise.resolve({
           callbackUrl: "http://localhost:1455/auth/callback",
-          setRelayUrl: (url) => relayUrls.push(url),
+          setRelayUrl: (url, state) => relayUrls.push(`${url}#state=${state}`),
           waitForRedirect: () => Promise.resolve(),
           close: () => {
             closeCalls += 1;
@@ -149,7 +153,7 @@ describe("Tough Crowd CLI", () => {
     );
     expect(runtime.stderr.output).toBe("");
     expect(relayUrls).toEqual([
-      "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user",
+      "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user#state=chatgpt-oauth-state",
     ]);
     expect(closeCalls).toBe(1);
   });
@@ -173,6 +177,7 @@ describe("Tough Crowd CLI", () => {
           JSON.stringify({
             relayUrl:
               "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user",
+            state: "chatgpt-oauth-state",
             expiresAt: "2026-09-14T20:10:00.000Z",
             heartbeatIntervalSeconds: 5,
           }),
@@ -209,6 +214,50 @@ describe("Tough Crowd CLI", () => {
     );
     expect(runtime.stderr.output).toBe("");
     expect(closeCalls).toBe(1);
+  });
+
+  it("stops the ChatGPT relay when interrupted while the listener is binding", async () => {
+    const controller = new AbortController();
+    let fetchCalls = 0;
+    let closeCalls = 0;
+    let resolveBinding!: (listener: ChatGptRelayListener) => void;
+    let markBindingStarted!: () => void;
+    const bindingStarted = new Promise<void>((resolve) => {
+      markBindingStarted = resolve;
+    });
+    const binding = new Promise<ChatGptRelayListener>((resolve) => {
+      resolveBinding = resolve;
+    });
+    const runtime = createRuntime({
+      signal: controller.signal,
+      fetch: createFetch(() => {
+        fetchCalls += 1;
+        throw new Error("The ready request must not start after interruption.");
+      }),
+      bindChatGptRelayListener: () => {
+        markBindingStarted();
+        return binding;
+      },
+    });
+
+    const running = runCli(["chatgpt", "relay", "7K3M-PQ9D-W2FX"], runtime);
+    await bindingStarted;
+    controller.abort();
+    resolveBinding({
+      callbackUrl: "http://localhost:1455/auth/callback",
+      setRelayUrl: () => {},
+      waitForRedirect: () => new Promise<void>(() => undefined),
+      close: () => {
+        closeCalls += 1;
+        return Promise.resolve();
+      },
+    });
+
+    await expect(running).resolves.toBe(130);
+    expect(fetchCalls).toBe(0);
+    expect(closeCalls).toBe(1);
+    expect(runtime.stdout.output).toBe("");
+    expect(runtime.stderr.output).toBe("");
   });
 
   it("can run repeatedly with independent injected streams", async () => {

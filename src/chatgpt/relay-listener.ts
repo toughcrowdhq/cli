@@ -6,7 +6,7 @@ const callbackPath = "/auth/callback";
 
 export type ChatGptRelayListener = {
   callbackUrl: string;
-  setRelayUrl(url: string): void;
+  setRelayUrl(url: string, state: string): void;
   waitForRedirect(): Promise<void>;
   close(): Promise<void>;
 };
@@ -15,13 +15,18 @@ export type ChatGptRelayListenerFactory = () => Promise<ChatGptRelayListener>;
 
 export async function bindChatGptRelayListener(): Promise<ChatGptRelayListener> {
   let relayUrl: URL | undefined;
+  let expectedState: string | undefined;
   let resolveRedirect!: () => void;
   const redirected = new Promise<void>((resolve) => {
     resolveRedirect = resolve;
   });
 
   const server = createServer((request, response) => {
-    if (request.method !== "GET" || !request.url) {
+    if (
+      request.method !== "GET" ||
+      request.headers.host !== `localhost:${relayPort}` ||
+      !request.url
+    ) {
       response.writeHead(404).end();
       return;
     }
@@ -38,16 +43,13 @@ export async function bindChatGptRelayListener(): Promise<ChatGptRelayListener> 
       response.writeHead(404).end();
       return;
     }
-    if (!relayUrl) {
+    if (!relayUrl || !expectedState) {
       response.writeHead(503).end("The Tough Crowd relay is not ready yet.");
       return;
     }
 
     const callbackParams = callbackUrl.searchParams;
-    if (
-      (!callbackParams.get("code") || !callbackParams.get("state")) &&
-      !callbackParams.get("error")
-    ) {
+    if (!isValidCallback(callbackUrl, expectedState)) {
       response.writeHead(400).end("The authorization callback is incomplete.");
       return;
     }
@@ -67,12 +69,38 @@ export async function bindChatGptRelayListener(): Promise<ChatGptRelayListener> 
 
   return {
     callbackUrl: `http://localhost:${relayPort}${callbackPath}`,
-    setRelayUrl(value) {
-      relayUrl = validateRelayUrl(value);
+    setRelayUrl(value, state) {
+      const validatedRelayUrl = validateRelayUrl(value);
+      const validatedState = validateState(state);
+      relayUrl = validatedRelayUrl;
+      expectedState = validatedState;
     },
     waitForRedirect: () => redirected,
     close: () => closeServer(server),
   };
+}
+
+function isValidCallback(url: URL, expectedState: string): boolean {
+  if (url.hash !== "") return false;
+  if (url.searchParams.get("state") !== expectedState) return false;
+
+  const code = url.searchParams.get("code");
+  if (code && hasExactQueryKeys(url, ["code", "state"])) return true;
+
+  const error = url.searchParams.get("error");
+  return Boolean(error && hasExactQueryKeys(url, ["error", "state"]));
+}
+
+function hasExactQueryKeys(url: URL, expectedKeys: readonly string[]): boolean {
+  const keys = [...url.searchParams.keys()].sort();
+  const expected = [...expectedKeys].sort();
+  return (
+    keys.length === expected.length &&
+    keys.every(
+      (key, index) =>
+        key === expected[index] && url.searchParams.getAll(key).length === 1,
+    )
+  );
 }
 
 function listen(server: Server): Promise<void> {
@@ -115,4 +143,9 @@ function validateRelayUrl(value: string): URL {
     throw new Error("The server returned an invalid browser relay URL.");
   }
   return url;
+}
+
+function validateState(value: string): string {
+  if (!value) throw new Error("The server returned an invalid OAuth state.");
+  return value;
 }

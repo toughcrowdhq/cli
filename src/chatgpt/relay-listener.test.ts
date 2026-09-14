@@ -7,6 +7,7 @@ describe("ChatGPT relay listener", () => {
     const listener = await bindChatGptRelayListener();
     listener.setRelayUrl(
       "https://app.toughcrowd.dev/oauth2/callback?provider=openai&expectedOwnerKind=user",
+      "codex-state",
     );
 
     const response = await get(
@@ -21,9 +22,55 @@ describe("ChatGPT relay listener", () => {
     );
     expect(response.connection).toBe("close");
   });
+
+  it("keeps waiting through invalid hosts, states, and callback query shapes", async () => {
+    const listener = await bindChatGptRelayListener();
+    listener.setRelayUrl(
+      "https://app.toughcrowd.dev/oauth2/callback?provider=openai",
+      "expected-state",
+    );
+    let redirectSettled = false;
+    const waitingForRedirect = listener.waitForRedirect().then(() => {
+      redirectSettled = true;
+    });
+
+    const responses = await Promise.all([
+      get(
+        "/auth/callback?code=codex-code&state=expected-state",
+        "127.0.0.1:1455",
+      ),
+      get("/auth/callback?code=codex-code&state=wrong"),
+      get("/auth/callback?code=codex-code&state=expected-state&extra=1"),
+      get(
+        "/auth/callback?code=codex-code&state=expected-state&state=expected-state",
+      ),
+      get("/auth/callback?error=access_denied"),
+      get("/auth/callback?error=access_denied&state=wrong"),
+      get("/auth/callback?error=access_denied&state=expected-state&extra=1"),
+    ]);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(redirectSettled).toBe(false);
+
+    const validResponse = await get(
+      "/auth/callback?error=access_denied&state=expected-state",
+    );
+    await waitingForRedirect;
+    await listener.close();
+
+    expect(responses.map((response) => response.statusCode)).toEqual([
+      404, 400, 400, 400, 400, 400, 400,
+    ]);
+    expect(validResponse.statusCode).toBe(303);
+    expect(validResponse.location).toBe(
+      "https://app.toughcrowd.dev/oauth2/callback?provider=openai#error=access_denied&state=expected-state",
+    );
+  });
 });
 
-function get(path: string): Promise<{
+function get(
+  path: string,
+  host = "localhost:1455",
+): Promise<{
   statusCode: number;
   location?: string;
   connection?: string;
@@ -35,7 +82,7 @@ function get(path: string): Promise<{
         port: 1455,
         path,
         method: "GET",
-        headers: { host: "localhost:1455" },
+        headers: { host },
       },
       (response) => {
         response.resume();

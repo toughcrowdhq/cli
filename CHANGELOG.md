@@ -1,5 +1,11 @@
 # @toughcrowd/cli
 
+## 0.8.0
+
+### Minor Changes
+
+- dda601c: Add `chatgpt relay <code>` for browser-owned ChatGPT authorization.
+
 ## 0.7.0
 
 ### Minor Changes

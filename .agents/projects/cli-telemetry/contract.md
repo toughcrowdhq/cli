@@ -26,7 +26,6 @@ responses, local I/O failures, and unexpected exceptions are actionable errors.
 Other API codes use an explicit classification table; unknown codes stay visible
 with conservative warning severity. Cancellation is neither a defect nor success.
 
-
 Error kinds are `usage`, `authentication`, `permission`, `api`, `network`,
 `timeout`, `malformed-response`, `local-I/O`, and `unexpected`. These exact
 tokens must be reconciled with the server schema before release. Cancellation
@@ -51,28 +50,38 @@ identity. Existing browser envelopes omit source or declare web-client; the CLI
 must never use that shape as a fallback. Strict CLI schemas reject unknown fields.
 
 ## Transport and attribution
+
 Use the existing origin selection and relative-path rules. No redirects and no
 fallback to production when a custom/local origin is selected. Transport bypasses
 normal command-error reporting to prevent recursion. Each send has a 500 ms
 deadline; finalization has a single 500 ms total budget for all in-flight sends,
 then aborts them and clears resources. Use an independent bounded flush signal
-after command cancellation. Credential access for telemetry shares that budget;
-reuse an already resolved credential whenever possible. Never initiate login.
-Do not introduce extra blocking keychain access on the command path.
+after command cancellation. Telemetry never reads the OS credential store and
+never initiates login (see attribution below), so credential access adds no
+blocking work to the command path or to the shutdown budget.
 
 No retries, on-disk queue, or telemetry warnings in normal output. `202` does not
 mean exactly-once storage. Deduplicate analysis by event/invocation IDs; no server
 deduplication table. Preserve current unexpected-error output and exit semantics.
 
-
 Proposed collection default is enabled. `TOUGHCROWD_TELEMETRY=0` or
-`DO_NOT_TRACK=1` disables reporting before telemetry-specific credential lookup,
+`DO_NOT_TRACK=1` disables reporting before telemetry credential selection,
 event collection, or network I/O. A command may still perform its own normal
 authentication and API work.
 
-Use an already resolved, origin-scoped bearer credential if available within the
-budget. Honor normal environment-over-keychain precedence. Anonymous requests
-are valid; do not invent a device ID or block reporting to force authentication.
+Telemetry may attach only one of these bearer credentials:
+
+1. a non-empty `TOUGHCROWD_API_KEY` environment value, or
+2. an origin-scoped credential already resolved by the command's normal work
+   for the same selected API origin.
+
+Otherwise the report is anonymous. Telemetry must never call the credential
+store (`Entry.getPassword()` is a synchronous native call that no timer, abort
+signal, or promise race can interrupt), so commands that do not otherwise
+resolve credentials, such as `config path` or `config list`, report anonymously.
+This preserves environment-over-keychain precedence without new keychain reads.
+Anonymous requests are valid; do not invent a device ID or block reporting to
+force authentication.
 No cookies. Valid credentials permit server-derived account attribution;
 missing/invalid credentials remain anonymous. Server infrastructure failures may
 reject ingestion. Do not send an account ID or repeat credential resolution
@@ -82,32 +91,32 @@ in response to rejection.
 
 Optional fields are omitted, not null. No arbitrary context object is accepted.
 
-| Field | Type / bound | Owner and meaning |
-| --- | --- | --- |
-| schemaVersion | integer, exactly 1 | Client contract version |
-| event | two-value enum | Client lifecycle event |
-| eventId, invocationId | UUID | Client event and command correlation |
-| clientTime | ISO UTC timestamp, ≤40 chars | Client occurrence time; untrusted |
-| cliVersion | string ≤64 | Package version, no build path |
-| nodeVersion | string ≤32 | Runtime version |
-| platform | enum | darwin/linux/win32/other |
-| arch | enum | x64/arm64/other |
-| command | canonical tokens, ≤120 chars | Registered command, no arguments |
-| executionContext | enum | ci/interactive/noninteractive; no provider/job IDs |
-| outcome | success/failure/canceled | Finished only |
-| durationMs | nonnegative finite integer | Finished only; monotonic duration |
-| exitCode | integer 0–255 | Finished only; actual CLI result |
-| error.kind | classification enum above | Failed outcomes only |
-| error.code | safe token ≤80 | Allowlisted diagnostic code, otherwise unknown |
-| error.name | safe token ≤80 | Allowlisted exception class, otherwise Error |
-| error.frames | ≤10 objects | Optional package-only stack frames |
-| error.frames[].file | package-relative path ≤200 | Only CLI package files |
-| error.frames[].line, column | positive integers | Optional source positions |
-| error.frames[].function | safe registered token ≤120 | Optional; omit unsafe names |
-| api.method | HTTP method enum | Optional failed request context |
-| api.route | registered template ≤160 | E.g. `/api/sessions/:sessionId`, never actual URL |
-| api.status | integer 100–599 | When response received |
-| api.requestId | validated token ≤80 | Failed business request, not telemetry POST |
+| Field                       | Type / bound                 | Owner and meaning                                  |
+| --------------------------- | ---------------------------- | -------------------------------------------------- |
+| schemaVersion               | integer, exactly 1           | Client contract version                            |
+| event                       | two-value enum               | Client lifecycle event                             |
+| eventId, invocationId       | UUID                         | Client event and command correlation               |
+| clientTime                  | ISO UTC timestamp, ≤40 chars | Client occurrence time; untrusted                  |
+| cliVersion                  | string ≤64                   | Package version, no build path                     |
+| nodeVersion                 | string ≤32                   | Runtime version                                    |
+| platform                    | enum                         | darwin/linux/win32/other                           |
+| arch                        | enum                         | x64/arm64/other                                    |
+| command                     | canonical tokens, ≤120 chars | Registered command, no arguments                   |
+| executionContext            | enum                         | ci/interactive/noninteractive; no provider/job IDs |
+| outcome                     | success/failure/canceled     | Finished only                                      |
+| durationMs                  | nonnegative finite integer   | Finished only; monotonic duration                  |
+| exitCode                    | integer 0–255                | Finished only; actual CLI result                   |
+| error.kind                  | classification enum above    | Failed outcomes only                               |
+| error.code                  | safe token ≤80               | Allowlisted diagnostic code, otherwise unknown     |
+| error.name                  | safe token ≤80               | Allowlisted exception class, otherwise Error       |
+| error.frames                | ≤10 objects                  | Optional package-only stack frames                 |
+| error.frames[].file         | package-relative path ≤200   | Only CLI package files                             |
+| error.frames[].line, column | positive integers            | Optional source positions                          |
+| error.frames[].function     | safe registered token ≤120   | Optional; omit unsafe names                        |
+| api.method                  | HTTP method enum             | Optional failed request context                    |
+| api.route                   | registered template ≤160     | E.g. `/api/sessions/:sessionId`, never actual URL  |
+| api.status                  | integer 100–599              | When response received                             |
+| api.requestId               | validated token ≤80          | Failed business request, not telemetry POST        |
 
 Started forbids terminal/error/API fields. Success and canceled forbid error/API
 fields. Failure requires error.kind/code/name; frames and API context are optional.
@@ -116,7 +125,6 @@ repository/session identifiers, working directory, or environment variable value
 Use fixed diagnostic codes to preserve meaning without messages. Strip the stack
 header and external frames; parse paths against the installed CLI package root.
 Discard frames that cannot be safely normalized; never send raw stack text.
-
 
 The event must never contain server-owned `recordVersion`, `source`,
 `environment`, `receivedAt`, `ingestionRequestId`, `identityKind`, `userId`,
@@ -128,33 +136,35 @@ request envelope. Severity, identity, fingerprint, and normalization are server 
 ```json
 {
   "source": "cli-client",
-  "entries": [{
-    "schemaVersion": 1,
-    "event": "cli.command.finished",
-    "eventId": "379097f2-bdf2-4ace-b60a-815d94cc0339",
-    "invocationId": "a2417495-daa6-4c57-89fb-dcaec3a32b42",
-    "clientTime": "2026-10-30T18:00:00.000Z",
-    "cliVersion": "0.8.0",
-    "nodeVersion": "22.14.0",
-    "platform": "darwin",
-    "arch": "arm64",
-    "command": "session list",
-    "executionContext": "interactive",
-    "outcome": "failure",
-    "durationMs": 842,
-    "exitCode": 1,
-    "error": {
-      "kind": "malformed-response",
-      "code": "response-schema-invalid",
-      "name": "ApiClientError"
-    },
-    "api": {
-      "method": "GET",
-      "route": "/api/sessions",
-      "status": 200,
-      "requestId": "business-request-example"
+  "entries": [
+    {
+      "schemaVersion": 1,
+      "event": "cli.command.finished",
+      "eventId": "379097f2-bdf2-4ace-b60a-815d94cc0339",
+      "invocationId": "a2417495-daa6-4c57-89fb-dcaec3a32b42",
+      "clientTime": "2026-10-30T18:00:00.000Z",
+      "cliVersion": "0.8.0",
+      "nodeVersion": "22.14.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "command": "session list",
+      "executionContext": "interactive",
+      "outcome": "failure",
+      "durationMs": 842,
+      "exitCode": 1,
+      "error": {
+        "kind": "malformed-response",
+        "code": "response-schema-invalid",
+        "name": "ApiClientError"
+      },
+      "api": {
+        "method": "GET",
+        "route": "/api/sessions",
+        "status": 200,
+        "requestId": "business-request-example"
+      }
     }
-  }]
+  ]
 }
 ```
 
@@ -188,4 +198,3 @@ Observed failure rates exclude cancellation; anonymous reports cannot identify
 unique users. Offline use, opt-out, rate limits, and abrupt termination undercount
 usage and failures. Zero reports do not prove health. There is no delivery SLA,
 local replay, installation tracking, or automated fix loop.
-

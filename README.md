@@ -404,6 +404,40 @@ Human output names the repository, deployed commit SHA, and asynchronous
 reconciliation state. Use `--json` to print the decoded API response for
 automation.
 
+## Telemetry
+
+Telemetry is enabled by default to help diagnose CLI failures and measure command
+use. To disable collection and all telemetry network activity, set either:
+
+```sh
+export TOUGHCROWD_TELEMETRY=0
+# Alternatively:
+export DO_NOT_TRACK=1
+```
+
+Recognized commands send a start and a completion event to `/api/client-logs` at
+the selected API origin. Reports include a random invocation ID, canonical command
+name, outcome, duration, exit code, CLI/Node versions, platform, architecture, and
+CI/interactive context. Failures may include allowlisted diagnostic codes,
+package-relative stack locations, HTTP method, route template, status, and the
+failed API request ID. Help, version, and unknown commands are excluded.
+
+Reports exclude arguments, prompts, repository/session identifiers, working
+directories, raw error messages, response bodies, arbitrary causes, and terminal
+output. Credentials are used only as bearer authorization: an environment API key
+or a credential already resolved by the command for that origin may permit
+server-derived account attribution. Telemetry never reads the OS keychain or
+starts authentication. Other reports are anonymous; no persistent installation
+or device identifier is created.
+
+Delivery is best effort, with no retries or disk queue and at most 500 ms of
+shutdown work. Offline use, opt-out, rejection, and abrupt termination can leave
+reports incomplete. Ingestion failures do not change command output or status.
+Anonymous collection, authenticated account attribution, enabled-by-default
+collection, and operator-only access with 30-day operational retention are the
+proposed rollout policy, pending product review and deployed-service verification
+before release. Retention and access are enforced by the service.
+
 ## Releases
 
 CLI releases use Changesets, protected `v<version>` Git tags, and npm Trusted

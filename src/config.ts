@@ -19,7 +19,15 @@ export interface ToughCrowdConfig {
 export type ConfigKey =
   "session.profile" | "session.model" | "session.reasoning-effort";
 
-export class ConfigError extends Error {}
+export class ConfigError extends Error {
+  constructor(
+    message: string,
+    readonly kind: "usage" | "local-I/O" = "usage",
+  ) {
+    super(message);
+    this.name = "ConfigError";
+  }
+}
 type ConfigurationEnvironment = object;
 
 export function configPath(
@@ -60,7 +68,10 @@ export async function readConfig(
     text = await readFile(path, "utf8");
   } catch (error: unknown) {
     if (isMissingFile(error)) return { formatVersion: configFormatVersion };
-    throw new ConfigError(`Could not read configuration at ${path}.`);
+    throw new ConfigError(
+      `Could not read configuration at ${path}.`,
+      "local-I/O",
+    );
   }
   try {
     return decodeConfig(JSON.parse(text));
@@ -85,7 +96,10 @@ export async function writeConfig(
     });
     await rename(temporary, path);
   } catch {
-    throw new ConfigError(`Could not write configuration at ${path}.`);
+    throw new ConfigError(
+      `Could not write configuration at ${path}.`,
+      "local-I/O",
+    );
   }
 }
 

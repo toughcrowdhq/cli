@@ -24,6 +24,7 @@ let openedUrl;
 let listenerCloseCount = 0;
 
 const exitCode = await runCli(["auth", "login"], {
+  telemetryFetch: () => Promise.resolve(new Response(null, { status: 202 })),
   stdout,
   stderr,
   version: cliVersion,

@@ -14,6 +14,7 @@ const stderr = createOutput();
 const fetchCalls = [];
 
 const exitCode = await runCli(["deploy", "report", "--json"], {
+  telemetryFetch: () => Promise.resolve(new Response(null, { status: 202 })),
   stdout,
   stderr,
   version: cliVersion,

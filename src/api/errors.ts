@@ -15,19 +15,25 @@ export interface ApiClientErrorOptions {
   requestId?: string;
   fields?: readonly ApiErrorField[];
   cause?: unknown;
+  method?: string;
+  route?: string;
 }
 
 export class ApiClientError extends Error {
+  method?: string;
+  route?: string;
   readonly kind: ApiFailureKind;
   readonly status?: number;
   readonly code?: string;
-  readonly requestId?: string;
+  requestId?: string;
   readonly fields: readonly ApiErrorField[];
 
   constructor(options: ApiClientErrorOptions) {
     super(options.message, { cause: options.cause });
     this.name = "ApiClientError";
     this.kind = options.kind;
+    this.method = options.method;
+    this.route = options.route;
     this.status = options.status;
     this.code = options.code;
     this.requestId = options.requestId;

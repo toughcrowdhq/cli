@@ -1,3 +1,4 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
 import { ApiClientError } from "../api/errors.js";
 import { apiKeyEnvironmentVariable } from "../auth/credentials.js";
 import { AuthCommandError } from "../auth/errors.js";
@@ -356,6 +357,16 @@ async function runIncidentOperation(
 }
 
 function formatIncidentFailure(operation: string, error: unknown): Error {
+  return preserveDiagnostic(
+    error,
+    formatIncidentFailureDiagnostic(operation, error),
+  );
+}
+
+function formatIncidentFailureDiagnostic(
+  operation: string,
+  error: unknown,
+): Error {
   if (
     error instanceof IncidentCommandError ||
     error instanceof AuthCommandError

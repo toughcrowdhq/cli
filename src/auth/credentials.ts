@@ -1,3 +1,4 @@
+import { observeCredential } from "../telemetry-context.js";
 import { Entry } from "@napi-rs/keyring";
 import { AuthCommandError } from "./errors.js";
 
@@ -35,12 +36,14 @@ export async function resolveCredential(options: {
 }): Promise<CredentialResolution | null> {
   const environmentKey = options.env?.[apiKeyEnvironmentVariable];
   if (environmentKey != null && environmentKey.length > 0) {
+    observeCredential(options.apiOrigin, environmentKey);
     return { apiKey: environmentKey, source: "environment" };
   }
 
   const storedKey = await options.store.read(options.apiOrigin);
   if (storedKey == null) return null;
 
+  observeCredential(options.apiOrigin, storedKey);
   return { apiKey: storedKey, source: "stored" };
 }
 

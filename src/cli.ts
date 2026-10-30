@@ -148,7 +148,6 @@ export async function runCli(
           }
         },
       );
-      return result;
     } finally {
       try {
         await telemetry?.finish(
@@ -156,11 +155,13 @@ export async function runCli(
           failure,
           runtime.signal.aborted,
           diagnostic,
+          runtime.signal,
         );
       } catch {
         // Collection and delivery cannot change the command's output or status.
       }
     }
+    return runtime.signal.aborted ? interruptedExitCode : result;
   };
   return telemetry == null
     ? execute()

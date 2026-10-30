@@ -277,16 +277,16 @@ export function createTelemetry(options: TelemetryOptions) {
         : undefined);
     const controller = new AbortController();
     controllers.add(controller);
-    // Race even transports that ignore abort; never await response bodies.
-    let deadline: unknown;
-    const timeout = new Promise<void>((resolve) => {
-      deadline = timers.setTimeout(() => {
-        controller.abort();
-        resolve();
-      }, 500);
+    // Resolve our own wait on abort even when a transport ignores its signal.
+    let resolveAbort!: () => void;
+    const aborted = new Promise<void>((resolve) => {
+      resolveAbort = resolve;
     });
+    controller.signal.addEventListener("abort", resolveAbort, { once: true });
+    const deadline = timers.setTimeout(() => controller.abort(), 500);
     const delivery = Promise.resolve()
       .then(async () => {
+        if (controller.signal.aborted) return;
         const response = await (options.fetch ?? fetch)(
           new URL("/api/client-logs", origin),
           {
@@ -304,8 +304,9 @@ export function createTelemetry(options: TelemetryOptions) {
         await response.body?.cancel();
       })
       .catch(() => {});
-    const pending = Promise.race([delivery, timeout]).finally(() => {
+    const pending = Promise.race([delivery, aborted]).finally(() => {
       timers.clearTimeout(deadline);
+      controller.signal.removeEventListener("abort", resolveAbort);
       controllers.delete(controller);
       sends.delete(pending);
     });
@@ -329,6 +330,7 @@ export function createTelemetry(options: TelemetryOptions) {
       error: unknown,
       canceled: boolean,
       diagnostic: DiagnosticContext,
+      shutdownSignal?: AbortSignal,
     ) {
       if (command == null || finished) return;
       finished = true;
@@ -338,27 +340,39 @@ export function createTelemetry(options: TelemetryOptions) {
           : exitCode === 0
             ? "success"
             : "failure";
-      send(
-        {
-          event: "cli.command.finished",
-          outcome,
-          durationMs: Math.max(0, Math.floor(now() - startedAt)),
-          exitCode,
-          ...(outcome === "failure"
-            ? safeDiagnostic(diagnosticFor(error))
-            : {}),
-        },
-        diagnostic,
-      );
+      const stopDelivery = (): void => {
+        for (const controller of controllers) controller.abort();
+      };
+      // Cancellation during command work still gets an independent bounded flush.
+      // A new interruption during shutdown stops that flush promptly.
+      if (!shutdownSignal?.aborted) {
+        shutdownSignal?.addEventListener("abort", stopDelivery, { once: true });
+      }
       let deadline: unknown;
-      await Promise.race([
-        Promise.all([...sends]),
-        new Promise<void>((resolve) => {
-          deadline = timers.setTimeout(resolve, 500);
-        }),
-      ]);
-      timers.clearTimeout(deadline);
-      for (const controller of controllers) controller.abort();
+      try {
+        send(
+          {
+            event: "cli.command.finished",
+            outcome,
+            durationMs: Math.max(0, Math.floor(now() - startedAt)),
+            exitCode,
+            ...(outcome === "failure"
+              ? safeDiagnostic(diagnosticFor(error))
+              : {}),
+          },
+          diagnostic,
+        );
+        await Promise.race([
+          Promise.all([...sends]),
+          new Promise<void>((resolve) => {
+            deadline = timers.setTimeout(resolve, 500);
+          }),
+        ]);
+      } finally {
+        timers.clearTimeout(deadline);
+        shutdownSignal?.removeEventListener("abort", stopDelivery);
+        stopDelivery();
+      }
     },
   };
 }

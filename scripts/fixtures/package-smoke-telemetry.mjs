@@ -8,6 +8,7 @@ assert(entry, "installed binary entry is required");
 let reports = [];
 let hangTelemetry = false;
 let onBusiness = () => {};
+let onTerminal = () => {};
 const server = createServer((request, response) => {
   let text = "";
   request.setEncoding("utf8");
@@ -23,6 +24,7 @@ const server = createServer((request, response) => {
         event: envelope.entries[0],
         authorization: request.headers.authorization,
       });
+      if (envelope.entries[0].event === "cli.command.finished") onTerminal();
       if (!hangTelemetry) {
         response.writeHead(202, { "content-type": "application/json" });
         response.end('{"accepted":1}');
@@ -78,6 +80,7 @@ try {
   let result = await run(["config", "path"]).completed;
   assert.equal(result.code, 0);
   assert.equal(result.stderr, "");
+  const configPathOutput = result.stdout;
   assert.deepEqual(
     reports.map(({ event }) => [event.event, event.command, event.outcome]),
     [
@@ -114,6 +117,33 @@ try {
   server.closeAllConnections();
   hangTelemetry = false;
   if (process.platform !== "win32") {
+    for (const signal of ["SIGINT", "SIGTERM"]) {
+      reports = [];
+      hangTelemetry = true;
+      const finalizing = new Promise((resolve) => {
+        onTerminal = resolve;
+      });
+      const { child, completed } = run(["config", "path"]);
+      // The terminal POST proves the business action has completed and the
+      // process is waiting only on the deliberately stalled telemetry transport.
+      await finalizing;
+      const interruptedAt = performance.now();
+      child.kill(signal);
+      result = await completed;
+      assert.deepEqual(result, {
+        code: 130,
+        stdout: configPathOutput,
+        stderr: "",
+      });
+      assert(
+        performance.now() - interruptedAt < 1000,
+        "signal did not interrupt telemetry finalization promptly",
+      );
+      assert.equal(reports.length, 2);
+      server.closeAllConnections();
+      hangTelemetry = false;
+      onTerminal = () => {};
+    }
     for (const signal of ["SIGINT", "SIGTERM"]) {
       reports = [];
       const business = new Promise((resolve) => {

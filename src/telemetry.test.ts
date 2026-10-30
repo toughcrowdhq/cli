@@ -1,3 +1,4 @@
+import { getEventListeners } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli, type CliRuntime } from "./cli.js";
 import { createTelemetry, safeDiagnostic, safeFrames } from "./telemetry.js";
@@ -289,6 +290,50 @@ describe("CLI telemetry", () => {
     expect(timers.setTimeout.mock.calls.map((call) => call[1])).toEqual([
       500, 500, 500,
     ]);
+  });
+
+  it("interrupts stalled finalization after the command action completes", async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    const controller = new AbortController();
+    f.runtime.signal = controller.signal;
+    const signals: AbortSignal[] = [];
+    let terminalStarted!: () => void;
+    const finalizing = new Promise<void>((resolve) => {
+      terminalStarted = resolve;
+    });
+    f.runtime.telemetryFetch = (_url, init) => {
+      signals.push(init.signal!);
+      const envelope = JSON.parse(init.body as string) as {
+        entries: { event: string }[];
+      };
+      if (envelope.entries[0].event === "cli.command.finished") {
+        terminalStarted();
+      }
+      // Deliberately ignore abort: shutdown must clean up its own wait/timers.
+      return new Promise(() => {});
+    };
+    const settled = vi.fn();
+    const running = runCli(["config", "path"], f.runtime).then((code) => {
+      settled(code);
+      return code;
+    });
+    await finalizing;
+    expect(f.stdout.write).toHaveBeenCalledTimes(1);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toHaveBeenCalledExactlyOnceWith(130);
+    expect(await running).toBe(130);
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(
+      signals.every(
+        (signal) => getEventListeners(signal, "abort").length === 0,
+      ),
+    ).toBe(true);
+    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(f.stderr.write).not.toHaveBeenCalled();
   });
 
   it("reports cancellation with an independent flush signal", async () => {

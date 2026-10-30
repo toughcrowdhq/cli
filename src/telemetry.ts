@@ -1,3 +1,4 @@
+import { AuthCommandError } from "./auth/errors.js";
 import { ConfigError } from "./config.js";
 import { isTelemetryRoute } from "./api/routes.js";
 import { randomUUID } from "node:crypto";
@@ -154,8 +155,15 @@ export function safeDiagnostic(error: unknown): {
     ) {
       kind = "usage";
       code = "invalid-arguments";
-    } else if (error.name === "AuthCommandError") {
+    } else if (error instanceof AuthCommandError) {
       kind = "authentication";
+      if (
+        error.diagnostic.kind === "local-I/O" &&
+        error.diagnostic.code === "credential-store-unavailable"
+      ) {
+        kind = "local-I/O";
+        code = "credential-store-unavailable";
+      }
     } else if (error instanceof ConfigError) {
       kind = error.kind;
       code =

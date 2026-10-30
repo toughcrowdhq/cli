@@ -129,6 +129,7 @@ function unavailableCredentialStoreError(_cause: unknown): AuthCommandError {
   return new AuthCommandError(
     `The operating-system credential store is unavailable. Use ${apiKeyEnvironmentVariable} for non-interactive authentication, or try again after enabling the OS credential store.`,
     1,
+    { kind: "local-I/O", code: "credential-store-unavailable" },
   );
 }
 

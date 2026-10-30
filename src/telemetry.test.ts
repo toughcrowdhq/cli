@@ -1,8 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli, type CliRuntime } from "./cli.js";
 import { createTelemetry, safeDiagnostic, safeFrames } from "./telemetry.js";
+import { AuthCommandError } from "./auth/errors.js";
+import { createKeyringCredentialStore } from "./auth/credentials.js";
 import { ApiClientError } from "./api/errors.js";
 import type { FetchLike } from "./api/request.js";
+
+const nativeKeyring = vi.hoisted(() => ({
+  read: vi.fn<() => string | null>(),
+  write: vi.fn<(value: string) => void>(),
+}));
+vi.mock("@napi-rs/keyring", () => ({
+  Entry: class {
+    getPassword(): string | null {
+      return nativeKeyring.read();
+    }
+    setPassword(value: string): void {
+      nativeKeyring.write(value);
+    }
+  },
+}));
 
 function fixture(env: NodeJS.ProcessEnv = {}) {
   const requests: {
@@ -39,7 +56,7 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
     requests.flatMap(
       (request) => request.body.entries as Record<string, unknown>[],
     );
-  return { runtime, requests, events, read, stderr };
+  return { runtime, requests, events, read, stderr, stdout };
 }
 afterEach(() => vi.useRealTimers());
 
@@ -432,6 +449,134 @@ describe("CLI telemetry", () => {
         (r) => Buffer.byteLength(r.init.body as string) <= 16384,
       ),
     ).toBe(true);
+  });
+
+  it.each([
+    ["auth", "status"],
+    ["session", "list"],
+  ])(
+    "reports native credential reads failing during %j as local I/O",
+    async (...args) => {
+      const f = fixture();
+      f.runtime.credentialStore = createKeyringCredentialStore();
+      await nativeKeyring.read.withImplementation(
+        () => {
+          throw new Error("native-read-canary /private/path");
+        },
+        async () => {
+          expect(await runCli(args as string[], f.runtime)).toBe(1);
+        },
+      );
+      expect(f.events()[1]).toMatchObject({
+        outcome: "failure",
+        exitCode: 1,
+        error: {
+          kind: "local-I/O",
+          code: "credential-store-unavailable",
+          name: "AuthCommandError",
+        },
+      });
+      expect(f.stderr.write).toHaveBeenCalledWith(
+        "The operating-system credential store is unavailable. Use TOUGHCROWD_API_KEY for non-interactive authentication, or try again after enabling the OS credential store.\n",
+      );
+      expect(f.stdout.write).not.toHaveBeenCalled();
+      expect(f.events()[1]).not.toHaveProperty("api");
+      expect(JSON.stringify(f.events())).not.toMatch(
+        /native-read-canary|private\/path/,
+      );
+      expect(
+        f.requests.every(
+          (request) => !new Headers(request.init.headers).has("authorization"),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it("reports native credential writes failing after login exchange as local I/O", async () => {
+    const f = fixture();
+    const key = `tc_key_${"A".repeat(22)}_${"B".repeat(43)}`;
+    const close = vi.fn(() => Promise.resolve());
+    f.runtime.credentialStore = createKeyringCredentialStore();
+    f.runtime.bindLoopbackListener = () =>
+      Promise.resolve({
+        callbackUri: "http://127.0.0.1:43123/callback",
+        waitForCallback: () =>
+          Promise.resolve({
+            kind: "approved",
+            code: "authorization-code-canary",
+          }),
+        close,
+      });
+    f.runtime.openUrl = () => Promise.resolve(true);
+    f.runtime.fetch = (url) =>
+      Promise.resolve(
+        Response.json(
+          url.pathname.endsWith("/exchange")
+            ? {
+                key,
+                apiKey: {
+                  id: "11111111-1111-4111-8111-111111111111",
+                  name: "CLI key",
+                  createdAt: "2026-10-30T18:00:00.000Z",
+                },
+                user: {
+                  id: "22222222-2222-4222-8222-222222222222",
+                  name: "User",
+                  email: "user@example.com",
+                },
+              }
+            : {
+                authorizationUrl:
+                  "https://app.toughcrowd.dev/cli/authorize?request=test",
+                expiresAt: "2026-10-30T18:05:00.000Z",
+              },
+        ),
+      );
+    await nativeKeyring.write.withImplementation(
+      () => {
+        throw new Error(`native-write-canary ${key}`);
+      },
+      async () => {
+        expect(await runCli(["auth", "login"], f.runtime)).toBe(1);
+      },
+    );
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(f.stdout.write).toHaveBeenCalledExactlyOnceWith(
+      "Authorize Tough Crowd CLI: https://app.toughcrowd.dev/cli/authorize?request=test\n",
+    );
+    expect(f.stderr.write).toHaveBeenCalledExactlyOnceWith(
+      "The operating-system credential store is unavailable. Use TOUGHCROWD_API_KEY for non-interactive authentication, or try again after enabling the OS credential store.\n",
+    );
+    expect(f.events()[1]).toMatchObject({
+      outcome: "failure",
+      exitCode: 1,
+      error: {
+        kind: "local-I/O",
+        code: "credential-store-unavailable",
+        name: "AuthCommandError",
+      },
+    });
+    expect(f.events()[1]).not.toHaveProperty("api");
+    expect(JSON.stringify(f.events())).not.toMatch(
+      /native-write-canary|authorization-code-canary|tc_key_/,
+    );
+    expect(
+      f.requests.every(
+        (request) => !new Headers(request.init.headers).has("authorization"),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps ordinary authentication errors in the expected authentication category", () => {
+    const error = new AuthCommandError("invalid-credential-canary");
+    error.stack = undefined;
+    expect(safeDiagnostic(error)).toEqual({
+      error: {
+        kind: "authentication",
+        code: "unknown",
+        name: "AuthCommandError",
+      },
+    });
   });
 
   it("normalizes only package frames and never walks causes or sends arbitrary diagnostics", () => {

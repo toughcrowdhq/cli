@@ -50,6 +50,7 @@ try {
     ["incident", "note", incidentId, "--body-file", notePath, "--json"],
     {
       ...process.env,
+      TOUGHCROWD_TELEMETRY: "0",
       TOUGHCROWD_API_ORIGIN: `http://127.0.0.1:${address.port}`,
       TOUGHCROWD_API_KEY: "tc_package_note_secret",
     },

@@ -20,6 +20,12 @@ the common outcome boundary. At most two single-event requests per invocation,
 no sampling, no heartbeat. A long-running command remains started until it exits.
 Durations use a monotonic clock, independent of client wall-clock time.
 
+Commit the command outcome and exit code together before emitting the terminal
+event. Before that boundary, interruption produces a canceled outcome with exit
+code 130. During telemetry cleanup, interruption instead aborts delivery promptly
+and preserves the committed outcome and exit code; an already-submitted terminal
+event cannot be revised or followed by a second terminal event.
+
 Expected usage/authentication/permission failures remain visible but not defect
 alerts. Network and timeout failures are actionable warnings. API 5xx, malformed
 responses, local I/O failures, and unexpected exceptions are actionable errors.

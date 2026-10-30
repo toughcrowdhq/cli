@@ -1,3 +1,4 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
 import { ApiClientError } from "../api/errors.js";
 import { apiKeyEnvironmentVariable } from "../auth/credentials.js";
 import { AuthCommandError } from "../auth/errors.js";
@@ -114,6 +115,10 @@ function readIdempotencyKey(value: string): string {
 }
 
 function formatCreateFailure(error: unknown): Error {
+  return preserveDiagnostic(error, formatCreateFailureDiagnostic(error));
+}
+
+function formatCreateFailureDiagnostic(error: unknown): Error {
   if (
     error instanceof SessionCommandError ||
     error instanceof AuthCommandError ||

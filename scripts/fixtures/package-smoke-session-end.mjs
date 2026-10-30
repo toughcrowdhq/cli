@@ -16,6 +16,7 @@ for (const action of ["cancel", "abandon"]) {
   const stderr = createOutput();
   const status = action === "cancel" ? "cancelling" : "abandoned";
   const exitCode = await runCli(["session", action, sessionId, "--json"], {
+    telemetryFetch: () => Promise.resolve(new Response(null, { status: 202 })),
     stdout,
     stderr,
     version: cliVersion,

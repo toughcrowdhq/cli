@@ -118,31 +118,55 @@ try {
   hangTelemetry = false;
   if (process.platform !== "win32") {
     for (const signal of ["SIGINT", "SIGTERM"]) {
-      reports = [];
-      hangTelemetry = true;
-      const finalizing = new Promise((resolve) => {
-        onTerminal = resolve;
-      });
-      const { child, completed } = run(["config", "path"]);
-      // The terminal POST proves the business action has completed and the
-      // process is waiting only on the deliberately stalled telemetry transport.
-      await finalizing;
-      const interruptedAt = performance.now();
-      child.kill(signal);
-      result = await completed;
-      assert.deepEqual(result, {
-        code: 130,
-        stdout: configPathOutput,
-        stderr: "",
-      });
-      assert(
-        performance.now() - interruptedAt < 1000,
-        "signal did not interrupt telemetry finalization promptly",
-      );
-      assert.equal(reports.length, 2);
-      server.closeAllConnections();
-      hangTelemetry = false;
-      onTerminal = () => {};
+      for (const scenario of [
+        {
+          args: ["config", "path"],
+          code: 0,
+          outcome: "success",
+          stdout: configPathOutput,
+          stderr: "",
+        },
+        {
+          args: ["session", "new"],
+          code: 2,
+          outcome: "failure",
+          stdout: "",
+          stderr: "error: missing required argument 'prompt'\n",
+        },
+      ]) {
+        reports = [];
+        hangTelemetry = true;
+        const finalizing = new Promise((resolve) => {
+          onTerminal = resolve;
+        });
+        const { child, completed } = run(scenario.args);
+        // Observe the terminal POST before signaling: the command result is
+        // committed and only the deliberately stalled delivery is still running.
+        await finalizing;
+        const terminal = reports.find(
+          ({ event }) => event.event === "cli.command.finished",
+        ).event;
+        assert.equal(terminal.outcome, scenario.outcome);
+        assert.equal(terminal.exitCode, scenario.code);
+        const interruptedAt = performance.now();
+        child.kill(signal);
+        result = await completed;
+        assert.deepEqual(result, {
+          code: scenario.code,
+          stdout: scenario.stdout,
+          stderr: scenario.stderr,
+        });
+        assert.equal(terminal.exitCode, result.code);
+        assert.equal(terminal.outcome, scenario.outcome);
+        assert(
+          performance.now() - interruptedAt < 1000,
+          "signal did not interrupt telemetry finalization promptly",
+        );
+        assert.equal(reports.length, 2);
+        server.closeAllConnections();
+        hangTelemetry = false;
+        onTerminal = () => {};
+      }
     }
     for (const signal of ["SIGINT", "SIGTERM"]) {
       reports = [];

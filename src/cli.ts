@@ -149,11 +149,14 @@ export async function runCli(
         },
       );
     } finally {
+      // Commit the result before emitting its terminal event. Later signals
+      // stop delivery without changing the status already reported.
+      result = runtime.signal.aborted ? interruptedExitCode : result;
       try {
         await telemetry?.finish(
           result,
           failure,
-          runtime.signal.aborted,
+          result === interruptedExitCode,
           diagnostic,
           runtime.signal,
         );
@@ -161,7 +164,7 @@ export async function runCli(
         // Collection and delivery cannot change the command's output or status.
       }
     }
-    return runtime.signal.aborted ? interruptedExitCode : result;
+    return result;
   };
   return telemetry == null
     ? execute()

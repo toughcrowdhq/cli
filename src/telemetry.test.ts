@@ -292,49 +292,66 @@ describe("CLI telemetry", () => {
     ]);
   });
 
-  it("interrupts stalled finalization after the command action completes", async () => {
-    vi.useFakeTimers();
-    const f = fixture();
-    const controller = new AbortController();
-    f.runtime.signal = controller.signal;
-    const signals: AbortSignal[] = [];
-    let terminalStarted!: () => void;
-    const finalizing = new Promise<void>((resolve) => {
-      terminalStarted = resolve;
-    });
-    f.runtime.telemetryFetch = (_url, init) => {
-      signals.push(init.signal!);
-      const envelope = JSON.parse(init.body as string) as {
-        entries: { event: string }[];
+  it.each([
+    { args: ["config", "path"], exitCode: 0, outcome: "success", stderr: "" },
+    {
+      args: ["session", "new"],
+      exitCode: 2,
+      outcome: "failure",
+      stderr: "error: missing required argument 'prompt'\n",
+    },
+  ])(
+    "preserves the committed $outcome result when finalization is interrupted",
+    async ({ args, exitCode, outcome, stderr }) => {
+      vi.useFakeTimers();
+      const f = fixture();
+      const controller = new AbortController();
+      f.runtime.signal = controller.signal;
+      const signals: AbortSignal[] = [];
+      const events: Record<string, unknown>[] = [];
+      let terminalStarted!: () => void;
+      const finalizing = new Promise<void>((resolve) => {
+        terminalStarted = resolve;
+      });
+      f.runtime.telemetryFetch = (_url, init) => {
+        signals.push(init.signal!);
+        const envelope = JSON.parse(init.body as string) as {
+          entries: Record<string, unknown>[];
+        };
+        events.push(...envelope.entries);
+        if (envelope.entries[0].event === "cli.command.finished") {
+          terminalStarted();
+        }
+        // Deliberately ignore abort: shutdown must clean up its own wait/timers.
+        return new Promise(() => {});
       };
-      if (envelope.entries[0].event === "cli.command.finished") {
-        terminalStarted();
-      }
-      // Deliberately ignore abort: shutdown must clean up its own wait/timers.
-      return new Promise(() => {});
-    };
-    const settled = vi.fn();
-    const running = runCli(["config", "path"], f.runtime).then((code) => {
-      settled(code);
-      return code;
-    });
-    await finalizing;
-    expect(f.stdout.write).toHaveBeenCalledTimes(1);
-    controller.abort();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(settled).toHaveBeenCalledExactlyOnceWith(130);
-    expect(await running).toBe(130);
-    expect(signals).toHaveLength(2);
-    expect(signals.every((signal) => signal.aborted)).toBe(true);
-    expect(
-      signals.every(
-        (signal) => getEventListeners(signal, "abort").length === 0,
-      ),
-    ).toBe(true);
-    expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
-    expect(vi.getTimerCount()).toBe(0);
-    expect(f.stderr.write).not.toHaveBeenCalled();
-  });
+      const settled = vi.fn();
+      const running = runCli(args, f.runtime).then((code) => {
+        settled(code);
+        return code;
+      });
+      await finalizing;
+      const terminal = events.find(
+        (event) => event.event === "cli.command.finished",
+      );
+      expect(terminal).toMatchObject({ outcome, exitCode });
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toHaveBeenCalledExactlyOnceWith(exitCode);
+      expect(await running).toBe(exitCode);
+      expect(terminal).toMatchObject({ outcome, exitCode });
+      expect(events).toHaveLength(2);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+      expect(
+        signals.every(
+          (signal) => getEventListeners(signal, "abort").length === 0,
+        ),
+      ).toBe(true);
+      expect(getEventListeners(controller.signal, "abort")).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(f.stderr.write.mock.calls).toEqual(stderr ? [[stderr]] : []);
+    },
+  );
 
   it("reports cancellation with an independent flush signal", async () => {
     const f = fixture({ TOUGHCROWD_API_KEY: "canary" });

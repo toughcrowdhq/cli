@@ -433,6 +433,9 @@ or device identifier is created.
 Delivery is best effort, with no retries or disk queue and at most 500 ms of
 shutdown work. Offline use, opt-out, rejection, and abrupt termination can leave
 reports incomplete. Ingestion failures do not change command output or status.
+The command result is committed before its completion event is sent. Signals
+during command execution return exit code 130; signals received only during
+telemetry cleanup stop delivery promptly and preserve the committed result.
 Anonymous collection, authenticated account attribution, enabled-by-default
 collection, and operator-only access with 30-day operational retention are the
 proposed rollout policy, pending product review and deployed-service verification

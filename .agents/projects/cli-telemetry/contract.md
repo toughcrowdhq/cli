@@ -11,7 +11,7 @@ Use `cli.command.started` and `cli.command.finished`. Finished carries outcome
 the same command failure. Generate invocation and event UUIDs in memory.
 
 Resolve command names from the registered command grammar, never from untrusted
-argv strings. Examples: `session list`, `session create`, `auth login`. Cover
+argv strings. Examples: `session list`, `session new`, `auth login`. Cover
 recognized-command validation before action execution. Help/version, unknown
 commands, and startup failures before the reporter exists are excluded.
 

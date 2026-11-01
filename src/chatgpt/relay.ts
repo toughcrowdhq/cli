@@ -1,3 +1,4 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
 import { ApiClientError } from "../api/errors.js";
 import {
   requestJson,
@@ -54,10 +55,15 @@ export async function relayChatGptAuthorization(
     try {
       listener = await (runtime.bindListener ?? bindChatGptRelayListener)();
     } catch (error) {
-      throw new ChatGptRelayError(
-        error instanceof Error && "code" in error && error.code === "EADDRINUSE"
-          ? "Port 1455 is already in use. Stop the other process and run the relay again."
-          : "Could not start the ChatGPT relay on localhost:1455.",
+      throw preserveDiagnostic(
+        error,
+        new ChatGptRelayError(
+          error instanceof Error &&
+            "code" in error &&
+            error.code === "EADDRINUSE"
+            ? "Port 1455 is already in use. Stop the other process and run the relay again."
+            : "Could not start the ChatGPT relay on localhost:1455.",
+        ),
       );
     }
     if (controller.signal.aborted) return;
@@ -102,12 +108,15 @@ export async function relayChatGptAuthorization(
     if (runtime.signal.aborted) return;
     if (error instanceof ChatGptRelayError) throw error;
     if (error instanceof ApiClientError && error.kind === "api") {
-      throw new ChatGptRelayError(error.message);
+      throw preserveDiagnostic(error, new ChatGptRelayError(error.message));
     }
-    throw new ChatGptRelayError(
-      error instanceof Error
-        ? error.message
-        : "The ChatGPT relay stopped unexpectedly.",
+    throw preserveDiagnostic(
+      error,
+      new ChatGptRelayError(
+        error instanceof Error
+          ? error.message
+          : "The ChatGPT relay stopped unexpectedly.",
+      ),
     );
   } finally {
     controller.abort();

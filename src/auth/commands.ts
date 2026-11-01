@@ -1,3 +1,4 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
 import { ApiClientError } from "../api/errors.js";
 import { ApiOriginError } from "../api/origin.js";
 import type { FetchLike, TimerCapabilities } from "../api/request.js";
@@ -185,6 +186,12 @@ async function tryOpenBrowser(
 }
 
 function formatAuthorizationFailure(error: unknown): AuthCommandError {
+  return preserveDiagnostic(error, formatAuthorizationFailureDiagnostic(error));
+}
+
+function formatAuthorizationFailureDiagnostic(
+  error: unknown,
+): AuthCommandError {
   if (error instanceof LoopbackAuthorizationError) {
     if (error.kind === "canceled") {
       return new AuthCommandError("Authentication canceled.", 130);
@@ -227,6 +234,10 @@ async function validate(
 }
 
 function formatValidationFailure(error: unknown): AuthCommandError {
+  return preserveDiagnostic(error, formatValidationFailureDiagnostic(error));
+}
+
+function formatValidationFailureDiagnostic(error: unknown): AuthCommandError {
   if (error instanceof ApiClientError) {
     if (error.kind === "api") {
       return new AuthCommandError(`Authentication failed: ${error.message}`);

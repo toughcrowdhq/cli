@@ -18,6 +18,7 @@ try {
     version: readPackageVersion(),
     signal: abortController.signal,
     env: process.env,
+    interactive: process.stdin.isTTY === true,
   });
 } finally {
   process.off("SIGINT", abort);

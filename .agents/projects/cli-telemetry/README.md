@@ -25,6 +25,9 @@ The contract is a proposal coordinated with the app project. Reconcile any
 contract changes in both repositories before release; the deployed supported
 OpenAPI contract becomes the executable authority once implemented.
 
+Implementation starts from CLI commit `233872362a67da795c6f51f112b9f979274d9a15`.
+Local verification evidence is recorded in [verification.md](verification.md).
+
 Relevant current boundaries:
 
 - `src/index.ts`: process startup, signal handling, finalization.
@@ -81,23 +84,23 @@ tests, real process cancellation/deadline tests, package smoke and release gates
       reconcile the public schema with contract.md. Accept or revise collection
       default, anonymous attribution, retention, and account metadata before release;
       obtain the app owner's confirmation of its operational readiness.
-- [ ] Add injectable reporter and early opt-out with no telemetry credential
+- [x] Add injectable reporter and early opt-out with no telemetry credential
       selection or network I/O when disabled; attach only the environment key or a
       credential the command already resolved, never reading the keychain; send
       explicit cli-client envelopes to client-logs with selected-origin-only
       transport and redirect refusal.
-- [ ] Wire canonical command start and one terminal event, including validation,
+- [x] Wire canonical command start and one terminal event, including validation,
       expected failures, wrapping, unexpected exceptions, and cancellation.
-- [ ] Preserve failed request IDs/method/route and safe diagnostics through API
+- [x] Preserve failed request IDs/method/route and safe diagnostics through API
       and command errors; add allowlisted codes and package-frame normalization.
-- [ ] Verify bounded shutdown, in-flight abort cleanup, offline/429/503 behavior,
+- [x] Verify bounded shutdown, in-flight abort cleanup, offline/429/503 behavior,
       no recursion, no retries, and exact existing stdout/stderr/exit behavior.
-- [ ] Verify old-server rejection and unsupported schema versions only drop
+- [x] Verify old-server rejection and unsupported schema versions only drop
       telemetry; prove product upgrade-required errors can still be reported through
       ingestion without retry or fallback to the browser schema.
-- [ ] Verify secret-canary exclusion, concurrent invocations, long-running commands,
+- [x] Verify secret-canary exclusion, concurrent invocations, long-running commands,
       help/version exclusions, and literal JSON shapes in emitted requests.
-- [ ] Publish collection/opt-out documentation and Changeset; run appropriate
+- [x] Publish collection/opt-out documentation and Changeset; run appropriate
       CLI format, lint, typecheck, tests, build, and packaged binary smoke checks.
 - [ ] Exercise synthetic end-to-end success, local failure, API failure, and
       anonymous login failure against deployed ingestion; prove query correlation

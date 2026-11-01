@@ -1,3 +1,4 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
 import { readFile } from "node:fs/promises";
 import { parseGitHubRepositoryOrigin } from "../session/inputs.js";
 import { IncidentCommandError } from "./errors.js";
@@ -108,8 +109,11 @@ export function readRequiredIncidentNoteBody(value: string): string {
 export async function readIncidentNoteBodyFile(path: string): Promise<string> {
   try {
     return await readFile(path, "utf8");
-  } catch {
-    throw new IncidentCommandError("Note body file could not be read.", 2);
+  } catch (error) {
+    throw preserveDiagnostic(
+      error,
+      new IncidentCommandError("Note body file could not be read.", 2),
+    );
   }
 }
 

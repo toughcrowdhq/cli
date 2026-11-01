@@ -1,3 +1,4 @@
+import { telemetryRoute } from "./routes.js";
 import { randomUUID } from "node:crypto";
 import { ApiClientError, decodeApiErrorEnvelope } from "./errors.js";
 import { defaultApiOrigin, parseApiOrigin } from "./origin.js";
@@ -79,6 +80,7 @@ async function request<T>(
     throw new TypeError("API request timeout must be greater than zero");
   }
 
+  const requestId = options.requestId ?? randomUUID();
   const timeoutController = new AbortController();
   const signal = combineSignals(options.signal, timeoutController.signal);
   const timers = options.timers ?? globalTimerCapabilities;
@@ -90,7 +92,7 @@ async function request<T>(
     const response = await callFetch(options.fetch ?? fetch, url, {
       method: options.method,
       redirect: "manual",
-      headers: createHeaders(options, options.requestId ?? randomUUID()),
+      headers: createHeaders(options, requestId),
       signal,
       ...(options.body !== undefined
         ? { body: JSON.stringify(options.body) }
@@ -103,7 +105,15 @@ async function request<T>(
 
     return await decodeErrorResponse(response);
   } catch (error) {
-    throw classifyFetchFailure(error, timeoutController.signal, options.signal);
+    const failure = classifyFetchFailure(
+      error,
+      timeoutController.signal,
+      options.signal,
+    );
+    failure.requestId ??= requestId;
+    failure.method = options.method;
+    failure.route = telemetryRoute(options.path);
+    throw failure;
   } finally {
     timers.clearTimeout(timeoutId);
   }

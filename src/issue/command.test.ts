@@ -575,6 +575,7 @@ function createRuntime(): CliRuntime & {
   stderr: MemoryWriter;
 } {
   return {
+    telemetryFetch: () => Promise.resolve(new Response(null, { status: 202 })),
     stdout: new MemoryWriter(),
     stderr: new MemoryWriter(),
     version: "0.4.0-test",

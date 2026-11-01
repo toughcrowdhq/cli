@@ -335,6 +335,19 @@ Commands:
     incidentNoteSmokeOutput === "Verified installed 256 KiB incident note\n",
     "installed CLI failed the 256 KiB incident-note smoke test",
   );
+  const telemetryOutput = execFileSync(
+    process.execPath,
+    [
+      resolve(packageDirectory, "scripts/fixtures/package-smoke-telemetry.mjs"),
+      resolve(installedPackageDirectory, "dist/index.js"),
+    ],
+    { encoding: "utf8", timeout: 20_000 },
+  );
+  assert(
+    telemetryOutput ===
+      "Verified installed telemetry lifecycle, deadlines, and cancellation\n",
+    "installed CLI failed telemetry smoke checks",
+  );
   console.log(`Verified packed toughcrowd ${metadata.version}`);
 } finally {
   rmSync(temporaryDirectory, { recursive: true, force: true });

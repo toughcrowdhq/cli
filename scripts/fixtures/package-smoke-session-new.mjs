@@ -29,6 +29,7 @@ const exitCode = await runCli(
     "--json",
   ],
   {
+    telemetryFetch: () => Promise.resolve(new Response(null, { status: 202 })),
     stdout,
     stderr,
     version: cliVersion,

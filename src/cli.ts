@@ -1,3 +1,9 @@
+import { createTelemetry } from "./telemetry.js";
+import {
+  preserveDiagnostic,
+  diagnosticContext,
+  type DiagnosticContext,
+} from "./telemetry-context.js";
 import {
   Command,
   CommanderError,
@@ -76,6 +82,8 @@ export interface CliRuntime {
   openUrl?(url: string): Promise<boolean>;
   readGitOrigin?(): Promise<string | null>;
   createIdempotencyKey?(): string;
+  telemetryFetch?: FetchLike;
+  interactive?: boolean;
 }
 
 const interruptedExitCode = 130;
@@ -85,6 +93,89 @@ const usageErrorExitCode = 2;
 export async function runCli(
   args: readonly string[],
   runtime: CliRuntime,
+): Promise<number> {
+  const diagnostic: DiagnosticContext = {};
+  let telemetry: ReturnType<typeof createTelemetry>;
+  try {
+    telemetry = createTelemetry({
+      env: runtime.env,
+      version: runtime.version,
+      fetch: runtime.telemetryFetch ?? runtime.fetch,
+      interactive: runtime.interactive,
+    });
+  } catch {
+    // Reporter initialization must never prevent a command from running.
+  }
+  let canonical: string | undefined;
+  const start = (): void => {
+    try {
+      if (canonical != null) telemetry?.start(canonical, diagnostic);
+    } catch {
+      /* Best effort. */
+    }
+  };
+  const execute = async () => {
+    let failure: unknown;
+    let result = 1;
+    try {
+      result = await executeCli(
+        args,
+        runtime,
+        (program) => {
+          const visit = (parent: Command, tokens: string[]): void => {
+            parent.hook("preSubcommand", (_parent, child) => {
+              canonical = [...tokens, child.name()].join(" ");
+            });
+            for (const child of parent.commands) {
+              visit(child, [...tokens, child.name()]);
+            }
+          };
+          visit(program, []);
+          program.hook("preAction", start);
+        },
+        (error) => {
+          failure = error;
+          if (
+            error instanceof CommanderError &&
+            error.exitCode !== 0 &&
+            ![
+              "commander.unknownCommand",
+              "commander.help",
+              "commander.helpDisplayed",
+            ].includes(error.code)
+          ) {
+            start();
+          }
+        },
+      );
+    } finally {
+      // Commit the result before emitting its terminal event. Later signals
+      // stop delivery without changing the status already reported.
+      result = runtime.signal.aborted ? interruptedExitCode : result;
+      try {
+        await telemetry?.finish(
+          result,
+          failure,
+          result === interruptedExitCode,
+          diagnostic,
+          runtime.signal,
+        );
+      } catch {
+        // Collection and delivery cannot change the command's output or status.
+      }
+    }
+    return result;
+  };
+  return telemetry == null
+    ? execute()
+    : diagnosticContext.run(diagnostic, execute);
+}
+
+async function executeCli(
+  args: readonly string[],
+  runtime: CliRuntime,
+  prepare: (program: Command) => void,
+  failed: (error: unknown) => void,
 ): Promise<number> {
   let interrupted = runtime.signal.aborted;
   const markInterrupted = (): void => {
@@ -97,6 +188,7 @@ export async function runCli(
     if (interrupted) return interruptedExitCode;
 
     const program = createRootProgram(runtime);
+    prepare(program);
 
     if (args.length === 0) {
       program.outputHelp();
@@ -107,6 +199,7 @@ export async function runCli(
 
     return interrupted ? interruptedExitCode : 0;
   } catch (error) {
+    failed(error);
     if (interrupted) return interruptedExitCode;
 
     if (error instanceof CommanderError) {
@@ -486,7 +579,10 @@ function createConfigCommand(runtime: CliRuntime): Command {
             reasoningEffort: config.session?.reasoningEffort,
           });
         } catch (error) {
-          throw new SessionCommandError(formatConfigSetFailure(error));
+          throw preserveDiagnostic(
+            error,
+            new SessionCommandError(formatConfigSetFailure(error)),
+          );
         }
         await writeConfig(config, runtime.env);
       }),
@@ -576,6 +672,10 @@ function createAgentProfileCommand(runtime: CliRuntime): Command {
 export function formatAgentProfileListFailure(
   error: unknown,
 ): SessionCommandError {
+  return preserveDiagnostic(error, formatAgentProfileListDiagnostic(error));
+}
+
+function formatAgentProfileListDiagnostic(error: unknown): SessionCommandError {
   if (error instanceof ApiClientError) {
     if (error.kind === "canceled") {
       return new SessionCommandError("Agent Profile listing canceled.", 130);

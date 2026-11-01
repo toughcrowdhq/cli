@@ -1,3 +1,4 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
 import { ApiClientError } from "../api/errors.js";
 import { apiKeyEnvironmentVariable } from "../auth/credentials.js";
 import { AuthCommandError } from "../auth/errors.js";
@@ -38,6 +39,13 @@ export async function end(
 }
 
 function formatEndFailure(error: unknown, action: SessionEndAction): Error {
+  return preserveDiagnostic(error, formatEndFailureDiagnostic(error, action));
+}
+
+function formatEndFailureDiagnostic(
+  error: unknown,
+  action: SessionEndAction,
+): Error {
   if (
     error instanceof SessionCommandError ||
     error instanceof AuthCommandError

@@ -1,3 +1,4 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
 import { ApiClientError } from "../api/errors.js";
 import { AuthCommandError } from "../auth/errors.js";
 import { apiKeyEnvironmentVariable } from "../auth/credentials.js";
@@ -38,6 +39,10 @@ export async function list(
 }
 
 function formatListFailure(error: unknown): Error {
+  return preserveDiagnostic(error, formatListFailureDiagnostic(error));
+}
+
+function formatListFailureDiagnostic(error: unknown): Error {
   if (
     error instanceof SessionCommandError ||
     error instanceof AuthCommandError

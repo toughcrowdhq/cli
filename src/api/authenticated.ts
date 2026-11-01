@@ -1,3 +1,5 @@
+import { preserveDiagnostic } from "../telemetry-context.js";
+import { AuthCommandError } from "../auth/errors.js";
 import { ApiOriginError } from "./origin.js";
 import type { FetchLike, TimerCapabilities } from "./request.js";
 import {
@@ -45,8 +47,11 @@ export async function resolveAuthenticatedApiRuntime(
   });
 
   if (credential == null) {
-    throw createError(
-      `Not authenticated for ${apiOrigin}. Run \`toughcrowd auth login\` or set ${apiKeyEnvironmentVariable}.`,
+    throw preserveDiagnostic(
+      new AuthCommandError("Authentication required"),
+      createError(
+        `Not authenticated for ${apiOrigin}. Run \`toughcrowd auth login\` or set ${apiKeyEnvironmentVariable}.`,
+      ),
     );
   }
 

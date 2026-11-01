@@ -20,6 +20,12 @@ the common outcome boundary. At most two single-event requests per invocation,
 no sampling, no heartbeat. A long-running command remains started until it exits.
 Durations use a monotonic clock, independent of client wall-clock time.
 
+Commit the command outcome and exit code together before emitting the terminal
+event. Before that boundary, interruption produces a canceled outcome with exit
+code 130. During telemetry cleanup, interruption instead aborts delivery promptly
+and preserves the committed outcome and exit code; an already-submitted terminal
+event cannot be revised or followed by a second terminal event.
+
 Expected usage/authentication/permission failures remain visible but not defect
 alerts. Network and timeout failures are actionable warnings. API 5xx, malformed
 responses, local I/O failures, and unexpected exceptions are actionable errors.
@@ -27,8 +33,9 @@ Other API codes use an explicit classification table; unknown codes stay visible
 with conservative warning severity. Cancellation is neither a defect nor success.
 
 Error kinds are `usage`, `authentication`, `permission`, `api`, `network`,
-`timeout`, `malformed-response`, `local-I/O`, and `unexpected`. These exact
-tokens must be reconciled with the server schema before release. Cancellation
+`timeout`, `malformed-response`, `local-io`, and `unexpected`. These wire
+tokens match the deployed v1 schema. Internal error classes may use a different
+spelling; the reporter normalizes them at the transport boundary. Cancellation
 uses outcome `canceled` and carries no error object.
 
 ## HTTP envelope
@@ -113,8 +120,8 @@ Optional fields are omitted, not null. No arbitrary context object is accepted.
 | error.frames[].file         | package-relative path ≤200   | Only CLI package files                             |
 | error.frames[].line, column | positive integers            | Optional source positions                          |
 | error.frames[].function     | safe registered token ≤120   | Optional; omit unsafe names                        |
-| api.method                  | HTTP method enum             | Optional failed request context                    |
-| api.route                   | registered template ≤160     | E.g. `/api/sessions/:sessionId`, never actual URL  |
+| api.method                  | HTTP method enum             | Required when optional API context is present      |
+| api.route                   | registered template ≤160     | Required with API context; never an actual URL     |
 | api.status                  | integer 100–599              | When response received                             |
 | api.requestId               | validated token ≤80          | Failed business request, not telemetry POST        |
 

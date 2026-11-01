@@ -470,7 +470,7 @@ describe("CLI telemetry", () => {
       ),
     ).toBe(2);
     expect(f.events()[1]).toMatchObject({
-      error: { kind: "local-I/O", code: "ENOENT", name: "Error" },
+      error: { kind: "local-io", code: "ENOENT", name: "Error" },
     });
     expect(JSON.stringify(f.events())).not.toContain(
       "nonexistent-directory-canary",
@@ -533,7 +533,7 @@ describe("CLI telemetry", () => {
         outcome: "failure",
         exitCode: 1,
         error: {
-          kind: "local-I/O",
+          kind: "local-io",
           code: "credential-store-unavailable",
           name: "AuthCommandError",
         },
@@ -613,7 +613,7 @@ describe("CLI telemetry", () => {
       outcome: "failure",
       exitCode: 1,
       error: {
-        kind: "local-I/O",
+        kind: "local-io",
         code: "credential-store-unavailable",
         name: "AuthCommandError",
       },
@@ -641,10 +641,54 @@ describe("CLI telemetry", () => {
     });
   });
 
+  it.each(["test", "v0.8.0", "0.8.0/private-canary"])(
+    "drops CLI versions outside the deployed schema: %s",
+    (version) => {
+      expect(createTelemetry({ version })).toBeUndefined();
+    },
+  );
+
+  it.each([
+    { status: 503, requestId: "request.1" },
+    { method: "GET", status: 503 },
+    { method: "GET", route: "/api/private-canary", status: 503 },
+    { method: "invalid-canary", route: "/api/sessions", status: 503 },
+  ])(
+    "omits incomplete or unsafe API context required by deployed v1",
+    (context) => {
+      expect(
+        safeDiagnostic(
+          new ApiClientError({
+            kind: "api",
+            message: "message-canary",
+            ...context,
+          }),
+        ),
+      ).not.toHaveProperty("api");
+    },
+  );
+
+  it("includes complete registered API context and dotted request IDs", () => {
+    const error = new ApiClientError({
+      kind: "api",
+      message: "ignored",
+      method: "GET",
+      route: "/api/sessions",
+      status: 503,
+      requestId: "request.1",
+    });
+    expect(safeDiagnostic(error).api).toEqual({
+      method: "GET",
+      route: "/api/sessions",
+      status: 503,
+      requestId: "request.1",
+    });
+  });
+
   it("normalizes only package frames and never walks causes or sends arbitrary diagnostics", () => {
     expect(
       safeFrames(
-        "Error: secret\n    at fn (/pkg/dist/cli.js:4:8)\n    at fn (/home/canary.js:1:2)\n    at fn (/pkg/node_modules/secret.js:1:2)\n    at fn (/pkg/src/../secret.js:1:2)",
+        "Error: secret\n    at fn (/pkg/dist/cli.js:4:8)\n    at fn (/home/canary.js:1:2)\n    at fn (/pkg/node_modules/secret.js:1:2)\n    at fn (/pkg/src/../secret.js:1:2)\n    at fn (/pkg/src/private.dir/secret.js:1:2)",
         "/pkg",
       ),
     ).toEqual([{ file: "dist/cli.js", line: 4, column: 8 }]);
@@ -660,7 +704,6 @@ describe("CLI telemetry", () => {
       "Error: stack-canary\n at fn (/private/absolute-canary.js:1:2)";
     expect(safeDiagnostic(error)).toEqual({
       error: { kind: "permission", code: "unknown", name: "ApiClientError" },
-      api: { status: 403 },
     });
   });
 });

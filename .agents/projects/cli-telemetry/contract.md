@@ -33,8 +33,9 @@ Other API codes use an explicit classification table; unknown codes stay visible
 with conservative warning severity. Cancellation is neither a defect nor success.
 
 Error kinds are `usage`, `authentication`, `permission`, `api`, `network`,
-`timeout`, `malformed-response`, `local-I/O`, and `unexpected`. These exact
-tokens must be reconciled with the server schema before release. Cancellation
+`timeout`, `malformed-response`, `local-io`, and `unexpected`. These wire
+tokens match the deployed v1 schema. Internal error classes may use a different
+spelling; the reporter normalizes them at the transport boundary. Cancellation
 uses outcome `canceled` and carries no error object.
 
 ## HTTP envelope
@@ -119,8 +120,8 @@ Optional fields are omitted, not null. No arbitrary context object is accepted.
 | error.frames[].file         | package-relative path ≤200   | Only CLI package files                             |
 | error.frames[].line, column | positive integers            | Optional source positions                          |
 | error.frames[].function     | safe registered token ≤120   | Optional; omit unsafe names                        |
-| api.method                  | HTTP method enum             | Optional failed request context                    |
-| api.route                   | registered template ≤160     | E.g. `/api/sessions/:sessionId`, never actual URL  |
+| api.method                  | HTTP method enum             | Required when optional API context is present      |
+| api.route                   | registered template ≤160     | Required with API context; never an actual URL     |
 | api.status                  | integer 100–599              | When response received                             |
 | api.requestId               | validated token ≤80          | Failed business request, not telemetry POST        |
 

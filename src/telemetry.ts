@@ -28,7 +28,7 @@ type Kind =
   | "network"
   | "timeout"
   | "malformed-response"
-  | "local-I/O"
+  | "local-io"
   | "unexpected";
 interface Frame {
   file: string;
@@ -88,7 +88,9 @@ export function safeFrames(
     const file = relative(resolve(root), resolve(path)).replaceAll("\\", "/");
     if (
       isAbsolute(file) ||
-      !/^(src|dist)\/[a-zA-Z0-9_./-]+\.[cm]?[jt]s$/.test(file) ||
+      !/^(src|dist)\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.[cm]?[jt]s$/.test(
+        file,
+      ) ||
       file.split("/").includes("..") ||
       file.length > 200
     ) {
@@ -123,26 +125,31 @@ export function safeDiagnostic(error: unknown): {
     else if (error.code != null && codes.has(error.code)) code = error.code;
     if (error.status === 401) kind = "authentication";
     if (error.status === 403) kind = "permission";
-    api = {
-      ...(error.method != null &&
+    if (
+      error.method != null &&
       ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].includes(
         error.method,
-      )
-        ? { method: error.method }
-        : {}),
-      ...(error.route != null && isTelemetryRoute(error.route)
-        ? { route: error.route }
-        : {}),
-      ...(error.status != null && error.status >= 100 && error.status <= 599
-        ? { status: error.status }
-        : {}),
-      ...(error.requestId != null &&
-      /^[a-zA-Z0-9_-]{1,80}$/.test(error.requestId)
-        ? { requestId: error.requestId }
-        : {}),
-    };
+      ) &&
+      error.route != null &&
+      isTelemetryRoute(error.route)
+    ) {
+      api = {
+        method: error.method,
+        route: error.route,
+        ...(error.status != null &&
+        Number.isInteger(error.status) &&
+        error.status >= 100 &&
+        error.status <= 599
+          ? { status: error.status }
+          : {}),
+        ...(error.requestId != null &&
+        /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/.test(error.requestId)
+          ? { requestId: error.requestId }
+          : {}),
+      };
+    }
   } else if (error instanceof LoopbackAuthorizationError) {
-    kind = error.kind === "timeout" ? "timeout" : "local-I/O";
+    kind = error.kind === "timeout" ? "timeout" : "local-io";
     code =
       error.kind === "timeout"
         ? "authorization-timeout"
@@ -161,11 +168,11 @@ export function safeDiagnostic(error: unknown): {
         error.diagnostic.kind === "local-I/O" &&
         error.diagnostic.code === "credential-store-unavailable"
       ) {
-        kind = "local-I/O";
+        kind = "local-io";
         code = "credential-store-unavailable";
       }
     } else if (error instanceof ConfigError) {
-      kind = error.kind;
+      kind = error.kind === "local-I/O" ? "local-io" : error.kind;
       code =
         error.kind === "usage"
           ? "invalid-configuration"
@@ -195,7 +202,7 @@ export function safeDiagnostic(error: unknown): {
         "EISDIR",
       ].includes(String(error.code))
     ) {
-      kind = "local-I/O";
+      kind = "local-io";
       code = String(error.code);
     }
   }
@@ -223,7 +230,12 @@ export function createTelemetry(options: TelemetryOptions) {
   } catch {
     return undefined;
   }
-  if (!/^[a-zA-Z0-9.+-]{1,64}$/.test(options.version)) return undefined;
+  if (
+    options.version.length > 64 ||
+    !/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)*$/.test(options.version)
+  ) {
+    return undefined;
+  }
   const timers: TimerCapabilities = options.timers ?? {
     setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
     clearTimeout: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),

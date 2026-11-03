@@ -100,7 +100,21 @@ try {
   assert.equal(result.code, 1);
   assert.equal(result.stdout, "");
   assert.equal(result.stderr, "Authentication failed: server-canary\n");
-  assert.equal(reports[1].event.api.requestId, "smoke-login-failure");
+  const responseEvent = reports.find(
+    ({ event }) => event.event === "cli.request.response",
+  ).event;
+  const startEvent = reports.find(
+    ({ event }) => event.event === "cli.request.started",
+  ).event;
+  const finishEvent = reports.find(
+    ({ event }) => event.event === "cli.command.finished",
+  ).event;
+  assert.equal(responseEvent.api.requestId, "smoke-login-failure");
+  assert.equal(finishEvent.api.requestId, "smoke-login-failure");
+  assert.equal(responseEvent.api.cliRequestId, startEvent.api.cliRequestId);
+  assert.equal(finishEvent.api.cliRequestId, startEvent.api.cliRequestId);
+  assert.equal(responseEvent.invocationId, finishEvent.invocationId);
+  assert.equal(reports.length, 4);
   assert(reports.every((report) => report.authorization === undefined));
   assert(!JSON.stringify(reports).includes("server-canary"));
   reports = [];
@@ -183,11 +197,23 @@ try {
       child.kill(signal);
       result = await completed;
       assert.deepEqual(result, { code: 130, stdout: "", stderr: "" });
-      assert.equal(reports.length, 2);
-      assert.equal(reports[1].event.outcome, "canceled");
-      assert.equal(reports[1].event.exitCode, 130);
-      assert(!("error" in reports[1].event));
-      assert(!("api" in reports[1].event));
+      assert.equal(reports.length, 4);
+      const terminal = reports.find(
+        ({ event }) => event.event === "cli.command.finished",
+      ).event;
+      const failed = reports.find(
+        ({ event }) => event.event === "cli.request.failed",
+      ).event;
+      const started = reports.find(
+        ({ event }) => event.event === "cli.request.started",
+      ).event;
+      assert.equal(terminal.outcome, "canceled");
+      assert.equal(terminal.exitCode, 130);
+      assert(!("error" in terminal));
+      assert(!("api" in terminal));
+      assert.equal(failed.reason, "canceled");
+      assert.equal(failed.api.cliRequestId, started.api.cliRequestId);
+      assert(!("requestId" in failed.api));
       assert(
         !JSON.stringify(reports.map(({ event }) => event)).includes(
           "smoke-canary",

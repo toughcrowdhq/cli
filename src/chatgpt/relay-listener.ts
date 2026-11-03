@@ -1,3 +1,4 @@
+import type { RelayTelemetryEvent as RelayEvent } from "../telemetry-context.js";
 import { createServer, type Server } from "node:http";
 
 const relayHost = "127.0.0.1";
@@ -11,9 +12,20 @@ export type ChatGptRelayListener = {
   close(): Promise<void>;
 };
 
-export type ChatGptRelayListenerFactory = () => Promise<ChatGptRelayListener>;
+export type { RelayTelemetryEvent as RelayEvent } from "../telemetry-context.js";
 
-export async function bindChatGptRelayListener(): Promise<ChatGptRelayListener> {
+type RelayListenerOptions = {
+  onEvent?: (event: RelayEvent) => void;
+  onInvalidCallback?: (message: string) => void;
+};
+
+export type ChatGptRelayListenerFactory = (
+  options?: RelayListenerOptions,
+) => Promise<ChatGptRelayListener>;
+
+export async function bindChatGptRelayListener(
+  options: RelayListenerOptions = {},
+): Promise<ChatGptRelayListener> {
   let relayUrl: URL | undefined;
   let expectedState: string | undefined;
   let resolveRedirect!: () => void;
@@ -27,6 +39,10 @@ export async function bindChatGptRelayListener(): Promise<ChatGptRelayListener> 
       request.headers.host !== `localhost:${relayPort}` ||
       !request.url
     ) {
+      options.onEvent?.({
+        event: "request_rejected",
+        reason: "invalid_request",
+      });
       response.writeHead(404).end();
       return;
     }
@@ -35,33 +51,62 @@ export async function bindChatGptRelayListener(): Promise<ChatGptRelayListener> 
     try {
       callbackUrl = new URL(request.url, `http://localhost:${relayPort}`);
     } catch {
+      options.onEvent?.({ event: "request_rejected", reason: "invalid_url" });
       response.writeHead(400).end("Invalid callback URL.");
       return;
     }
 
     if (callbackUrl.pathname !== callbackPath) {
+      options.onEvent?.({
+        event: "request_rejected",
+        reason: "invalid_request",
+      });
       response.writeHead(404).end();
       return;
     }
     if (!relayUrl || !expectedState) {
+      options.onEvent?.({ event: "request_rejected", reason: "not_ready" });
       response.writeHead(503).end("The Tough Crowd relay is not ready yet.");
       return;
     }
 
     const callbackParams = callbackUrl.searchParams;
     if (!isValidCallback(callbackUrl, expectedState)) {
-      response.writeHead(400).end("The authorization callback is incomplete.");
+      const message =
+        "The authorization callback is invalid or does not match this relay. Return to Tough Crowd and restart ChatGPT authorization.";
+      options.onInvalidCallback?.(message);
+      options.onEvent?.({
+        event: "request_rejected",
+        reason: "invalid_callback",
+      });
+      response.writeHead(400).end(message);
       return;
     }
 
     const destination = new URL(relayUrl);
-    destination.hash = callbackParams.toString();
+    const forwarded = new URLSearchParams();
+    for (const key of ["code", "state", "error", "error_description"]) {
+      const value = callbackParams.get(key);
+      if (value !== null) forwarded.set(key, value);
+    }
+    destination.hash = forwarded.toString();
     response.writeHead(303, {
       location: destination.toString(),
       "cache-control": "no-store",
       connection: "close",
     });
-    response.once("finish", resolveRedirect);
+    response.once("finish", () => {
+      options.onEvent?.({ event: "redirect_sent" });
+      resolveRedirect();
+    });
+    response.once("close", () => {
+      if (!response.writableFinished) {
+        options.onEvent?.({
+          event: "request_rejected",
+          reason: "redirect_failed",
+        });
+      }
+    });
     response.end();
   });
 
@@ -82,24 +127,20 @@ export async function bindChatGptRelayListener(): Promise<ChatGptRelayListener> 
 
 function isValidCallback(url: URL, expectedState: string): boolean {
   if (url.hash !== "") return false;
-  if (url.searchParams.get("state") !== expectedState) return false;
+  const params = url.searchParams;
+  if (
+    params.getAll("state").length !== 1 ||
+    params.get("state") !== expectedState
+  ) {
+    return false;
+  }
 
-  const code = url.searchParams.get("code");
-  if (code && hasExactQueryKeys(url, ["code", "state"])) return true;
-
-  const error = url.searchParams.get("error");
-  return Boolean(error && hasExactQueryKeys(url, ["error", "state"]));
-}
-
-function hasExactQueryKeys(url: URL, expectedKeys: readonly string[]): boolean {
-  const keys = [...url.searchParams.keys()].sort();
-  const expected = [...expectedKeys].sort();
+  // Provider metadata may evolve; only validate the fields that control the result.
+  const codes = params.getAll("code");
+  const errors = params.getAll("error");
   return (
-    keys.length === expected.length &&
-    keys.every(
-      (key, index) =>
-        key === expected[index] && url.searchParams.getAll(key).length === 1,
-    )
+    (codes.length === 1 && Boolean(codes[0]) && errors.length === 0) ||
+    (errors.length === 1 && Boolean(errors[0]) && codes.length === 0)
   );
 }
 

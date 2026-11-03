@@ -1,4 +1,4 @@
-import { preserveDiagnostic } from "../telemetry-context.js";
+import { observeRelayEvent, preserveDiagnostic } from "../telemetry-context.js";
 import { ApiClientError } from "../api/errors.js";
 import {
   requestJson,
@@ -53,7 +53,10 @@ export async function relayChatGptAuthorization(
   try {
     if (controller.signal.aborted) return;
     try {
-      listener = await (runtime.bindListener ?? bindChatGptRelayListener)();
+      listener = await (runtime.bindListener ?? bindChatGptRelayListener)({
+        onEvent: observeRelayEvent,
+        onInvalidCallback: (message) => runtime.stderr.write(`${message}\n`),
+      });
     } catch (error) {
       throw preserveDiagnostic(
         error,

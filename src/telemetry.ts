@@ -8,7 +8,12 @@ import { LoopbackAuthorizationError } from "./auth/loopback.js";
 import { ApiClientError } from "./api/errors.js";
 import type { FetchLike, TimerCapabilities } from "./api/request.js";
 import { resolveAuthOrigin } from "./auth/origins.js";
-import { diagnosticFor, type DiagnosticContext } from "./telemetry-context.js";
+import {
+  diagnosticFor,
+  type DiagnosticContext,
+  type RelayTelemetryEvent,
+  type RequestTelemetryEvent,
+} from "./telemetry-context.js";
 
 interface TelemetryOptions {
   env?: NodeJS.ProcessEnv;
@@ -134,6 +139,9 @@ export function safeDiagnostic(error: unknown): {
       isTelemetryRoute(error.route)
     ) {
       api = {
+        ...(error.cliRequestId && /^[0-9a-f-]{36}$/i.test(error.cliRequestId)
+          ? { cliRequestId: error.cliRequestId }
+          : {}),
         method: error.method,
         route: error.route,
         ...(error.status != null &&
@@ -260,7 +268,7 @@ export function createTelemetry(options: TelemetryOptions) {
     diagnostic: DiagnosticContext,
   ) {
     const event: Record<string, unknown> = {
-      schemaVersion: 1,
+      schemaVersion: 3,
       eventId: uuid(),
       invocationId,
       clientTime: wallTime().toISOString(),
@@ -336,6 +344,41 @@ export function createTelemetry(options: TelemetryOptions) {
       command = name;
       startedAt = now();
       send({ event: "cli.command.started" }, diagnostic);
+    },
+    request(event: RequestTelemetryEvent, diagnostic: DiagnosticContext) {
+      if (command == null || finished || !isTelemetryRoute(event.api.route)) {
+        return;
+      }
+      const { requestId, ...api } = event.api;
+      send(
+        {
+          ...event,
+          api: {
+            ...api,
+            ...(requestId &&
+            /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/.test(requestId)
+              ? { requestId }
+              : {}),
+          },
+        },
+        diagnostic,
+      );
+    },
+    relay(event: RelayTelemetryEvent, diagnostic: DiagnosticContext) {
+      if (command !== "chatgpt relay" || finished) return;
+      send(
+        {
+          schemaVersion: 2,
+          event:
+            event.event === "redirect_sent"
+              ? "cli.relay.redirect_sent"
+              : "cli.relay.request_rejected",
+          ...(event.event === "request_rejected"
+            ? { reason: event.reason }
+            : {}),
+        },
+        diagnostic,
+      );
     },
     async finish(
       exitCode: number,

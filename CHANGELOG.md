@@ -1,5 +1,22 @@
 # @toughcrowd/cli
 
+## 0.9.0
+
+### Minor Changes
+
+- 599fc71: Report API request starts, responses, and transport failures with per-call client IDs and server-returned request IDs, linked to the command invocation. Keep client IDs distinct from server IDs on failures. Requires the backend telemetry schema v3 reader before release.
+- 0f5aa4d: Add best-effort CLI command telemetry with safe failure diagnostics and request correlation. Disable collection with `TOUGHCROWD_TELEMETRY=0` or `DO_NOT_TRACK=1`. Reporting uses the selected API origin, never reads the keychain, and bounds shutdown delivery to 500 ms.
+
+### Patch Changes
+
+- 2aa1f6b: Bound relay telemetry to one observation per rejection reason per invocation, cap concurrent telemetry deliveries, and show invalid callback warnings only once per listener.
+
+  Reserve delivery capacity for the command completion event so telemetry saturation preserves its outcome and failure diagnostic.
+
+- 599fc71: Tolerate additional provider parameters in ChatGPT authorization callbacks while validating state and an unambiguous code or error. Forward only consumed callback fields and report rejected callbacks in the terminal without logging credentials.
+
+  Report rejected callbacks and sent redirects through the shared CLI telemetry reporter using schema v2, honoring opt-outs and the silent 500 ms delivery budget.
+
 ## 0.8.0
 
 ### Minor Changes

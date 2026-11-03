@@ -896,15 +896,63 @@ it("caps pending telemetry deliveries without queuing excess observations", asyn
     );
   }
   await vi.advanceTimersByTimeAsync(0);
-  expect(send).toHaveBeenCalledTimes(8);
-  expect(vi.getTimerCount()).toBe(8);
+  expect(send).toHaveBeenCalledTimes(7);
+  expect(vi.getTimerCount()).toBe(7);
   await vi.advanceTimersByTimeAsync(500);
   expect(vi.getTimerCount()).toBe(0);
   await vi.advanceTimersByTimeAsync(1000);
-  expect(send).toHaveBeenCalledTimes(8);
+  expect(send).toHaveBeenCalledTimes(7);
   const finished = reporter.finish(0, undefined, false, {});
   await vi.advanceTimersByTimeAsync(500);
   await finished;
-  expect(send).toHaveBeenCalledTimes(9);
+  expect(send).toHaveBeenCalledTimes(8);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("dispatches the command failure while observation deliveries are saturated", async () => {
+  vi.useFakeTimers();
+  const requests: RequestInit[] = [];
+  const reporter = createTelemetry({
+    version: "0.8.0",
+    fetch: (_url, init) => {
+      requests.push(init);
+      return new Promise<Response>(() => {});
+    },
+  })!;
+  reporter.start("chatgpt relay", {});
+  for (const reason of [
+    "invalid_request",
+    "invalid_url",
+    "not_ready",
+    "invalid_callback",
+    "redirect_failed",
+  ] as const) {
+    reporter.relay({ event: "request_rejected", reason }, {});
+  }
+  reporter.relay({ event: "redirect_sent" }, {});
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toHaveLength(7);
+  expect(vi.getTimerCount()).toBe(7);
+  expect(requests.every((request) => !request.signal?.aborted)).toBe(true);
+
+  const error = new TypeError("private-error-message");
+  error.stack = undefined;
+  const finished = reporter.finish(1, error, false, {});
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toHaveLength(8);
+  expect(JSON.parse(requests[7].body as string)).toMatchObject({
+    entries: [
+      {
+        event: "cli.command.finished",
+        outcome: "failure",
+        exitCode: 1,
+        error: { kind: "unexpected", code: "unknown", name: "TypeError" },
+      },
+    ],
+  });
+  expect(requests.every((request) => !request.signal?.aborted)).toBe(true);
+  await vi.advanceTimersByTimeAsync(500);
+  await finished;
+  expect(requests.every((request) => request.signal?.aborted)).toBe(true);
   expect(vi.getTimerCount()).toBe(0);
 });

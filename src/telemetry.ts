@@ -268,8 +268,10 @@ export function createTelemetry(options: TelemetryOptions) {
     fields: Record<string, unknown>,
     diagnostic: DiagnosticContext,
   ) {
+    // Reserve the eighth delivery for the command outcome and diagnostic.
     // Drop excess observations instead of allocating an unbounded delivery queue.
-    if (sends.size >= 8) return;
+    const capacity = fields.event === "cli.command.finished" ? 8 : 7;
+    if (sends.size >= capacity) return;
     const event: Record<string, unknown> = {
       schemaVersion: 3,
       eventId: uuid(),

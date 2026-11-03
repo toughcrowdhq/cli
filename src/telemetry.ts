@@ -8,7 +8,12 @@ import { LoopbackAuthorizationError } from "./auth/loopback.js";
 import { ApiClientError } from "./api/errors.js";
 import type { FetchLike, TimerCapabilities } from "./api/request.js";
 import { resolveAuthOrigin } from "./auth/origins.js";
-import { diagnosticFor, type DiagnosticContext } from "./telemetry-context.js";
+import {
+  diagnosticFor,
+  type DiagnosticContext,
+  type RelayTelemetryEvent,
+  type RequestTelemetryEvent,
+} from "./telemetry-context.js";
 
 interface TelemetryOptions {
   env?: NodeJS.ProcessEnv;
@@ -134,6 +139,9 @@ export function safeDiagnostic(error: unknown): {
       isTelemetryRoute(error.route)
     ) {
       api = {
+        ...(error.cliRequestId && /^[0-9a-f-]{36}$/i.test(error.cliRequestId)
+          ? { cliRequestId: error.cliRequestId }
+          : {}),
         method: error.method,
         route: error.route,
         ...(error.status != null &&
@@ -246,6 +254,7 @@ export function createTelemetry(options: TelemetryOptions) {
   const invocationId = uuid();
   const sends = new Set<Promise<void>>();
   const controllers = new Set<AbortController>();
+  const relayObservations = new Set<string>();
   let command: string | undefined;
   let startedAt = 0;
   let finished = false;
@@ -259,8 +268,12 @@ export function createTelemetry(options: TelemetryOptions) {
     fields: Record<string, unknown>,
     diagnostic: DiagnosticContext,
   ) {
+    // Reserve the eighth delivery for the command outcome and diagnostic.
+    // Drop excess observations instead of allocating an unbounded delivery queue.
+    const capacity = fields.event === "cli.command.finished" ? 8 : 7;
+    if (sends.size >= capacity) return;
     const event: Record<string, unknown> = {
-      schemaVersion: 1,
+      schemaVersion: 3,
       eventId: uuid(),
       invocationId,
       clientTime: wallTime().toISOString(),
@@ -336,6 +349,47 @@ export function createTelemetry(options: TelemetryOptions) {
       command = name;
       startedAt = now();
       send({ event: "cli.command.started" }, diagnostic);
+    },
+    request(event: RequestTelemetryEvent, diagnostic: DiagnosticContext) {
+      if (command == null || finished || !isTelemetryRoute(event.api.route)) {
+        return;
+      }
+      const { requestId, ...api } = event.api;
+      send(
+        {
+          ...event,
+          api: {
+            ...api,
+            ...(requestId &&
+            /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/.test(requestId)
+              ? { requestId }
+              : {}),
+          },
+        },
+        diagnostic,
+      );
+    },
+    relay(event: RelayTelemetryEvent, diagnostic: DiagnosticContext) {
+      if (command !== "chatgpt relay" || finished) return;
+      // The unauthenticated listener can receive arbitrary request volumes.
+      // Keep only the first observation of each reason and the first redirect.
+      const observation =
+        event.event === "request_rejected" ? event.reason : event.event;
+      if (relayObservations.has(observation)) return;
+      relayObservations.add(observation);
+      send(
+        {
+          schemaVersion: 2,
+          event:
+            event.event === "redirect_sent"
+              ? "cli.relay.redirect_sent"
+              : "cli.relay.request_rejected",
+          ...(event.event === "request_rejected"
+            ? { reason: event.reason }
+            : {}),
+        },
+        diagnostic,
+      );
     },
     async finish(
       exitCode: number,

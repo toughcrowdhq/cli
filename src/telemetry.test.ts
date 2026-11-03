@@ -62,7 +62,7 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
 afterEach(() => vi.useRealTimers());
 
 describe("CLI telemetry", () => {
-  it("emits literal v1 envelopes with deterministic IDs and monotonic duration", async () => {
+  it("emits literal v3 envelopes with deterministic IDs and monotonic duration", async () => {
     const bodies: unknown[] = [];
     let time = 10;
     const ids = [
@@ -85,7 +85,7 @@ describe("CLI telemetry", () => {
     time = 852;
     await reporter.finish(0, undefined, false, {});
     const base = {
-      schemaVersion: 1,
+      schemaVersion: 3,
       invocationId: "a2417495-daa6-4c57-89fb-dcaec3a32b42",
       clientTime: "2026-10-30T18:00:00.000Z",
       cliVersion: "0.8.0",
@@ -131,7 +131,10 @@ describe("CLI telemetry", () => {
       ["cli.command.started", "config path", undefined],
       ["cli.command.finished", "config path", "success"],
     ]);
-    expect(f.events()[0].invocationId).toBe(f.events()[1].invocationId);
+    expect(f.events()[0].invocationId).toBe(
+      f.events().find((event) => event.event === "cli.command.finished")!
+        .invocationId,
+    );
     expect(f.read).not.toHaveBeenCalled();
     for (const { url, init } of f.requests) {
       expect(url.href).toBe("http://localhost:4321/api/client-logs");
@@ -179,7 +182,9 @@ describe("CLI telemetry", () => {
     const f = fixture();
     expect(await runCli(parts as string[], f.runtime)).toBe(2);
     expect(f.events()).toHaveLength(2);
-    expect(f.events()[1]).toMatchObject({
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({
       outcome: "failure",
       exitCode: 2,
       error: { kind: "usage", code: "invalid-arguments" },
@@ -199,7 +204,9 @@ describe("CLI telemetry", () => {
     expect(
       await runCli(["session", "list", "--repo", "repo-canary"], f.runtime),
     ).toBe(1);
-    expect(f.events()[1]).toMatchObject({
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({
       outcome: "failure",
       error: {
         kind: "malformed-response",
@@ -242,7 +249,9 @@ describe("CLI telemetry", () => {
     expect(new Headers(f.requests[1].init.headers).get("authorization")).toBe(
       "Bearer stored-canary",
     );
-    expect(f.events()[1]).toMatchObject({
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({
       error: { code: "client-upgrade-required", kind: "api" },
     });
   });
@@ -362,9 +371,15 @@ describe("CLI telemetry", () => {
       return Promise.reject(new Error("cancellation-canary"));
     };
     expect(await runCli(["session", "list"], f.runtime)).toBe(130);
-    expect(f.events()[1]).toMatchObject({ outcome: "canceled", exitCode: 130 });
-    expect(f.events()[1]).not.toHaveProperty("error");
-    expect(f.events()[1]).not.toHaveProperty("api");
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({ outcome: "canceled", exitCode: 130 });
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).not.toHaveProperty("error");
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).not.toHaveProperty("api");
     expect(f.requests.every((r) => !r.init.signal?.aborted)).toBe(true);
   });
 
@@ -402,11 +417,14 @@ describe("CLI telemetry", () => {
     await started;
     expect(f.events().map((event) => event.event)).toEqual([
       "cli.command.started",
+      "cli.request.started",
     ]);
     release();
     expect(await running).toBe(1);
     expect(f.events().map((event) => event.event)).toEqual([
       "cli.command.started",
+      "cli.request.started",
+      "cli.request.response",
       "cli.command.finished",
     ]);
   });
@@ -429,13 +447,17 @@ describe("CLI telemetry", () => {
         f.runtime,
       ),
     ).toBe(1);
-    expect(f.events()[1]).toMatchObject({
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({
       error: { kind: "unexpected", code: "unknown", name: "TypeError" },
     });
     expect(JSON.stringify(f.events())).not.toMatch(
       /message-canary|prompt-canary|acme/,
     );
-    expect(f.events()[1]).not.toHaveProperty("api");
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).not.toHaveProperty("api");
   });
 
   it("classifies invalid config keys as expected usage failures", async () => {
@@ -443,7 +465,9 @@ describe("CLI telemetry", () => {
       TOUGHCROWD_CONFIG: "/nonexistent-directory-canary/config.json",
     });
     expect(await runCli(["config", "unset", "key-canary"], f.runtime)).toBe(1);
-    expect(f.events()[1]).toMatchObject({
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({
       error: {
         kind: "usage",
         code: "invalid-configuration",
@@ -469,7 +493,9 @@ describe("CLI telemetry", () => {
         f.runtime,
       ),
     ).toBe(2);
-    expect(f.events()[1]).toMatchObject({
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({
       error: { kind: "local-io", code: "ENOENT", name: "Error" },
     });
     expect(JSON.stringify(f.events())).not.toContain(
@@ -529,7 +555,9 @@ describe("CLI telemetry", () => {
           expect(await runCli(args as string[], f.runtime)).toBe(1);
         },
       );
-      expect(f.events()[1]).toMatchObject({
+      expect(
+        f.events().find((event) => event.event === "cli.command.finished")!,
+      ).toMatchObject({
         outcome: "failure",
         exitCode: 1,
         error: {
@@ -542,7 +570,9 @@ describe("CLI telemetry", () => {
         "The operating-system credential store is unavailable. Use TOUGHCROWD_API_KEY for non-interactive authentication, or try again after enabling the OS credential store.\n",
       );
       expect(f.stdout.write).not.toHaveBeenCalled();
-      expect(f.events()[1]).not.toHaveProperty("api");
+      expect(
+        f.events().find((event) => event.event === "cli.command.finished")!,
+      ).not.toHaveProperty("api");
       expect(JSON.stringify(f.events())).not.toMatch(
         /native-read-canary|private\/path/,
       );
@@ -609,7 +639,9 @@ describe("CLI telemetry", () => {
     expect(f.stderr.write).toHaveBeenCalledExactlyOnceWith(
       "The operating-system credential store is unavailable. Use TOUGHCROWD_API_KEY for non-interactive authentication, or try again after enabling the OS credential store.\n",
     );
-    expect(f.events()[1]).toMatchObject({
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).toMatchObject({
       outcome: "failure",
       exitCode: 1,
       error: {
@@ -618,7 +650,9 @@ describe("CLI telemetry", () => {
         name: "AuthCommandError",
       },
     });
-    expect(f.events()[1]).not.toHaveProperty("api");
+    expect(
+      f.events().find((event) => event.event === "cli.command.finished")!,
+    ).not.toHaveProperty("api");
     expect(JSON.stringify(f.events())).not.toMatch(
       /native-write-canary|authorization-code-canary|tc_key_/,
     );
@@ -706,4 +740,219 @@ describe("CLI telemetry", () => {
       error: { kind: "permission", code: "unknown", name: "ApiClientError" },
     });
   });
+});
+
+it.each([{}, { TOUGHCROWD_TELEMETRY: "0" }, { DO_NOT_TRACK: "1" }])(
+  "routes relay observations through shared telemetry and honors opt-outs: %j",
+  async (env) => {
+    const { runtime, requests, events, stderr, read } = fixture(env);
+    runtime.fetch = (url) => {
+      expect(url.pathname).toBe(
+        "/api/model-credential-authorizations/relay/ready",
+      );
+      return Promise.resolve(
+        Response.json({
+          relayUrl:
+            "https://app.toughcrowd.dev/oauth2/callback?provider=openai",
+          state: "private-oauth-state",
+          expiresAt: "2026-11-01T20:10:00.000Z",
+          heartbeatIntervalSeconds: 5,
+        }),
+      );
+    };
+    runtime.bindChatGptRelayListener = (options) =>
+      Promise.resolve({
+        callbackUrl: "http://localhost:1455/auth/callback",
+        setRelayUrl: () => {},
+        close: () => Promise.resolve(),
+        waitForRedirect: () => {
+          options?.onEvent?.({
+            event: "request_rejected",
+            reason: "invalid_callback",
+          });
+          options?.onEvent?.({ event: "redirect_sent" });
+          return Promise.resolve();
+        },
+      });
+    expect(await runCli(["chatgpt", "relay", "7K3M-PQ9D-W2FX"], runtime)).toBe(
+      0,
+    );
+    expect(stderr.write).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(Object.keys(env).length ? 0 : 6);
+    if (Object.keys(env).length) return;
+    expect(events().map((event) => [event.schemaVersion, event.event])).toEqual(
+      [
+        [3, "cli.command.started"],
+        [3, "cli.request.started"],
+        [3, "cli.request.response"],
+        [2, "cli.relay.request_rejected"],
+        [2, "cli.relay.redirect_sent"],
+        [3, "cli.command.finished"],
+      ],
+    );
+    expect(new Set(events().map((event) => event.invocationId)).size).toBe(1);
+    expect(events()[3]).toMatchObject({
+      command: "chatgpt relay",
+      reason: "invalid_callback",
+    });
+    expect(events()[4]).not.toHaveProperty("reason");
+    expect(events()[5]).toMatchObject({ outcome: "success", exitCode: 0 });
+    expect(
+      requests.every((request) => request.url.pathname === "/api/client-logs"),
+    ).toBe(true);
+    expect(JSON.stringify(events())).not.toMatch(
+      /7K3M|private-oauth-state|callbackUrl/,
+    );
+  },
+);
+
+it("silently bounds relay observation delivery within the shared shutdown budget", async () => {
+  vi.useFakeTimers();
+  const requests: RequestInit[] = [];
+  const reporter = createTelemetry({
+    version: "0.8.0",
+    fetch: (_url, init) => {
+      requests.push(init);
+      return new Promise<Response>(() => {});
+    },
+  });
+  reporter?.start("chatgpt relay", {});
+  reporter?.relay(
+    { event: "request_rejected", reason: "invalid_callback" },
+    {},
+  );
+  reporter?.relay({ event: "redirect_sent" }, {});
+  const finished = reporter?.finish(0, undefined, false, {});
+  await vi.advanceTimersByTimeAsync(500);
+  await finished;
+  expect(requests).toHaveLength(4);
+  expect(requests.every((request) => request.signal?.aborted)).toBe(true);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("coalesces rejected callback bursts across the entire invocation", async () => {
+  vi.useFakeTimers();
+  const requests: RequestInit[] = [];
+  const reporter = createTelemetry({
+    version: "0.8.0",
+    fetch: (_url, init) => {
+      requests.push(init);
+      // Ignore abort to exercise the reporter's own bounded pending deliveries.
+      return new Promise<Response>(() => {});
+    },
+  })!;
+  reporter.start("chatgpt relay", {});
+  const burst = () => {
+    for (let i = 0; i < 1000; i++) {
+      for (const reason of [
+        "invalid_request",
+        "invalid_url",
+        "not_ready",
+        "invalid_callback",
+        "redirect_failed",
+      ] as const) {
+        reporter.relay({ event: "request_rejected", reason }, {});
+      }
+    }
+  };
+  burst();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toHaveLength(6);
+  expect(vi.getTimerCount()).toBe(6);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(vi.getTimerCount()).toBe(0);
+  expect(requests.every((request) => request.signal?.aborted)).toBe(true);
+
+  // Finishing a delivery must not replenish the per-invocation report budget.
+  burst();
+  for (let i = 0; i < 1000; i++) {
+    reporter.relay({ event: "redirect_sent" }, {});
+  }
+  const finished = reporter.finish(0, undefined, false, {});
+  await vi.advanceTimersByTimeAsync(500);
+  await finished;
+  expect(requests).toHaveLength(8);
+  expect(requests.every((request) => request.signal?.aborted)).toBe(true);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("caps pending telemetry deliveries without queuing excess observations", async () => {
+  vi.useFakeTimers();
+  const send = vi.fn(() => new Promise<Response>(() => {}));
+  const reporter = createTelemetry({ version: "0.8.0", fetch: send })!;
+  reporter.start("chatgpt relay", {});
+  for (let i = 0; i < 1000; i++) {
+    reporter.request(
+      {
+        event: "cli.request.started",
+        api: {
+          cliRequestId: "11111111-1111-4111-8111-111111111111",
+          method: "POST",
+          route: "/api/model-credential-authorizations/relay/heartbeat",
+        },
+      },
+      {},
+    );
+  }
+  await vi.advanceTimersByTimeAsync(0);
+  expect(send).toHaveBeenCalledTimes(7);
+  expect(vi.getTimerCount()).toBe(7);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(vi.getTimerCount()).toBe(0);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(send).toHaveBeenCalledTimes(7);
+  const finished = reporter.finish(0, undefined, false, {});
+  await vi.advanceTimersByTimeAsync(500);
+  await finished;
+  expect(send).toHaveBeenCalledTimes(8);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("dispatches the command failure while observation deliveries are saturated", async () => {
+  vi.useFakeTimers();
+  const requests: RequestInit[] = [];
+  const reporter = createTelemetry({
+    version: "0.8.0",
+    fetch: (_url, init) => {
+      requests.push(init);
+      return new Promise<Response>(() => {});
+    },
+  })!;
+  reporter.start("chatgpt relay", {});
+  for (const reason of [
+    "invalid_request",
+    "invalid_url",
+    "not_ready",
+    "invalid_callback",
+    "redirect_failed",
+  ] as const) {
+    reporter.relay({ event: "request_rejected", reason }, {});
+  }
+  reporter.relay({ event: "redirect_sent" }, {});
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toHaveLength(7);
+  expect(vi.getTimerCount()).toBe(7);
+  expect(requests.every((request) => !request.signal?.aborted)).toBe(true);
+
+  const error = new TypeError("private-error-message");
+  error.stack = undefined;
+  const finished = reporter.finish(1, error, false, {});
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toHaveLength(8);
+  expect(JSON.parse(requests[7].body as string)).toMatchObject({
+    entries: [
+      {
+        event: "cli.command.finished",
+        outcome: "failure",
+        exitCode: 1,
+        error: { kind: "unexpected", code: "unknown", name: "TypeError" },
+      },
+    ],
+  });
+  expect(requests.every((request) => !request.signal?.aborted)).toBe(true);
+  await vi.advanceTimersByTimeAsync(500);
+  await finished;
+  expect(requests.every((request) => request.signal?.aborted)).toBe(true);
+  expect(vi.getTimerCount()).toBe(0);
 });

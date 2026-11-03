@@ -106,6 +106,9 @@ export async function runCli(
   } catch {
     // Reporter initialization must never prevent a command from running.
   }
+  diagnostic.reportRequestEvent = (event) =>
+    telemetry?.request(event, diagnostic);
+  diagnostic.reportRelayEvent = (event) => telemetry?.relay(event, diagnostic);
   let canonical: string | undefined;
   const start = (): void => {
     try {

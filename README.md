@@ -128,6 +128,13 @@ The relay does not require Tough Crowd CLI authentication. It listens only on
 redirects the browser's ChatGPT callback back to Tough Crowd. It never receives
 or stores the resulting ChatGPT credentials.
 
+The relay reports `cli.relay.request_rejected` (with a fixed failure reason) and
+`cli.relay.redirect_sent` through the shared CLI telemetry reporter. Events use
+schema version 2 and the command's invocation ID; they contain no pairing code,
+OAuth code, state, callback URL, or provider error description. A sent redirect
+confirms only that the CLI sent the response, not a completed ChatGPT connection.
+The same telemetry opt-outs and silent 500 ms delivery budget apply.
+
 ## Sessions
 
 Create a durable cloud session with a prompt and repository:
@@ -420,7 +427,18 @@ the selected API origin. Reports include a random invocation ID, canonical comma
 name, outcome, duration, exit code, CLI/Node versions, platform, architecture, and
 CI/interactive context. Failures may include allowlisted diagnostic codes,
 package-relative stack locations, HTTP method, route template, status, and the
-failed API request ID. Help, version, and unknown commands are excluded.
+failed API request ID. API calls also send `cli.request.started` and
+`cli.request.response` (or `cli.request.failed`) events with the same invocation
+ID and a per-call `api.cliRequestId`. Response events include the server-returned
+`api.requestId` when available, HTTP status, and time to response headers. Network
+failures retain the client ID without inventing a server ID. These IDs connect
+command activity to authenticated backend request logs. Only registered route
+templates are reported; request and response bodies are never included.
+Help, version, and unknown commands are excluded.
+
+Command and API-request events use schema version 3. Deploy the backend v3 reader
+before releasing this producer; retained v1 records remain readable. Relay
+observation events retain their separate schema version 2.
 
 Reports exclude arguments, prompts, repository/session identifiers, working
 directories, raw error messages, response bodies, arbitrary causes, and terminal

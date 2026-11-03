@@ -1,3 +1,4 @@
+import { observeRequestEvent } from "../telemetry-context.js";
 import { telemetryRoute } from "./routes.js";
 import { randomUUID } from "node:crypto";
 import { ApiClientError, decodeApiErrorEnvelope } from "./errors.js";
@@ -37,7 +38,7 @@ interface RequestOptions {
   authorization?: string;
   body?: JsonValue;
   idempotencyKey?: string;
-  requestId?: string;
+  cliRequestId?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
   fetch?: FetchLike;
@@ -80,7 +81,12 @@ async function request<T>(
     throw new TypeError("API request timeout must be greater than zero");
   }
 
-  const requestId = options.requestId ?? randomUUID();
+  const cliRequestId = options.cliRequestId ?? randomUUID();
+  const startedAt = performance.now();
+  const route = telemetryRoute(options.path);
+  const api = { cliRequestId, method: options.method, route: route ?? "" };
+  let receivedResponse = false;
+  let serverRequestId: string | undefined;
   const timeoutController = new AbortController();
   const signal = combineSignals(options.signal, timeoutController.signal);
   const timers = options.timers ?? globalTimerCapabilities;
@@ -89,15 +95,26 @@ async function request<T>(
   }, timeoutMs);
 
   try {
+    if (route) observeRequestEvent({ event: "cli.request.started", api });
     const response = await callFetch(options.fetch ?? fetch, url, {
       method: options.method,
       redirect: "manual",
-      headers: createHeaders(options, requestId),
+      headers: createHeaders(options, cliRequestId),
       signal,
       ...(options.body !== undefined
         ? { body: JSON.stringify(options.body) }
         : {}),
     });
+
+    receivedResponse = true;
+    serverRequestId = readHeader(response, requestIdHeader);
+    if (route) {
+      observeRequestEvent({
+        event: "cli.request.response",
+        api: { ...api, status: response.status, requestId: serverRequestId },
+        durationMs: Math.max(0, Math.floor(performance.now() - startedAt)),
+      });
+    }
 
     if (response.ok) {
       return await decodeSuccess(response);
@@ -110,7 +127,19 @@ async function request<T>(
       timeoutController.signal,
       options.signal,
     );
-    failure.requestId ??= requestId;
+    failure.cliRequestId = cliRequestId;
+    failure.requestId = serverRequestId ?? failure.requestId;
+    if (route && !receivedResponse) {
+      observeRequestEvent({
+        event: "cli.request.failed",
+        api,
+        durationMs: Math.max(0, Math.floor(performance.now() - startedAt)),
+        reason:
+          failure.kind === "timeout" || failure.kind === "canceled"
+            ? failure.kind
+            : "network",
+      });
+    }
     failure.method = options.method;
     failure.route = telemetryRoute(options.path);
     throw failure;

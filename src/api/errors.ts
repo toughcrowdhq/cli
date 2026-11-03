@@ -12,6 +12,7 @@ export interface ApiClientErrorOptions {
   message: string;
   status?: number;
   code?: string;
+  cliRequestId?: string;
   requestId?: string;
   fields?: readonly ApiErrorField[];
   cause?: unknown;
@@ -25,6 +26,7 @@ export class ApiClientError extends Error {
   readonly kind: ApiFailureKind;
   readonly status?: number;
   readonly code?: string;
+  cliRequestId?: string;
   requestId?: string;
   readonly fields: readonly ApiErrorField[];
 
@@ -37,6 +39,7 @@ export class ApiClientError extends Error {
     this.status = options.status;
     this.code = options.code;
     this.requestId = options.requestId;
+    this.cliRequestId = options.cliRequestId;
     this.fields = options.fields ?? [];
   }
 }

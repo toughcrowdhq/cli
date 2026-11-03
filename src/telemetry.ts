@@ -254,6 +254,7 @@ export function createTelemetry(options: TelemetryOptions) {
   const invocationId = uuid();
   const sends = new Set<Promise<void>>();
   const controllers = new Set<AbortController>();
+  const relayObservations = new Set<string>();
   let command: string | undefined;
   let startedAt = 0;
   let finished = false;
@@ -267,6 +268,8 @@ export function createTelemetry(options: TelemetryOptions) {
     fields: Record<string, unknown>,
     diagnostic: DiagnosticContext,
   ) {
+    // Drop excess observations instead of allocating an unbounded delivery queue.
+    if (sends.size >= 8) return;
     const event: Record<string, unknown> = {
       schemaVersion: 3,
       eventId: uuid(),
@@ -366,6 +369,12 @@ export function createTelemetry(options: TelemetryOptions) {
     },
     relay(event: RelayTelemetryEvent, diagnostic: DiagnosticContext) {
       if (command !== "chatgpt relay" || finished) return;
+      // The unauthenticated listener can receive arbitrary request volumes.
+      // Keep only the first observation of each reason and the first redirect.
+      const observation =
+        event.event === "request_rejected" ? event.reason : event.event;
+      if (relayObservations.has(observation)) return;
+      relayObservations.add(observation);
       send(
         {
           schemaVersion: 2,

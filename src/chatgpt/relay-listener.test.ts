@@ -97,7 +97,7 @@ describe("ChatGPT relay listener", () => {
     expect(responses.map((response) => response.statusCode)).toEqual([
       404, 400, 400, 400, 400, 400, 400, 400,
     ]);
-    expect(onInvalidCallback).toHaveBeenCalledTimes(7);
+    expect(onInvalidCallback).toHaveBeenCalledTimes(1);
     expect(onInvalidCallback).toHaveBeenCalledWith(
       "The authorization callback is invalid or does not match this relay. Return to Tough Crowd and restart ChatGPT authorization.",
     );

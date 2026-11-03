@@ -830,3 +830,81 @@ it("silently bounds relay observation delivery within the shared shutdown budget
   expect(requests.every((request) => request.signal?.aborted)).toBe(true);
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it("coalesces rejected callback bursts across the entire invocation", async () => {
+  vi.useFakeTimers();
+  const requests: RequestInit[] = [];
+  const reporter = createTelemetry({
+    version: "0.8.0",
+    fetch: (_url, init) => {
+      requests.push(init);
+      // Ignore abort to exercise the reporter's own bounded pending deliveries.
+      return new Promise<Response>(() => {});
+    },
+  })!;
+  reporter.start("chatgpt relay", {});
+  const burst = () => {
+    for (let i = 0; i < 1000; i++) {
+      for (const reason of [
+        "invalid_request",
+        "invalid_url",
+        "not_ready",
+        "invalid_callback",
+        "redirect_failed",
+      ] as const) {
+        reporter.relay({ event: "request_rejected", reason }, {});
+      }
+    }
+  };
+  burst();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toHaveLength(6);
+  expect(vi.getTimerCount()).toBe(6);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(vi.getTimerCount()).toBe(0);
+  expect(requests.every((request) => request.signal?.aborted)).toBe(true);
+
+  // Finishing a delivery must not replenish the per-invocation report budget.
+  burst();
+  for (let i = 0; i < 1000; i++) {
+    reporter.relay({ event: "redirect_sent" }, {});
+  }
+  const finished = reporter.finish(0, undefined, false, {});
+  await vi.advanceTimersByTimeAsync(500);
+  await finished;
+  expect(requests).toHaveLength(8);
+  expect(requests.every((request) => request.signal?.aborted)).toBe(true);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("caps pending telemetry deliveries without queuing excess observations", async () => {
+  vi.useFakeTimers();
+  const send = vi.fn(() => new Promise<Response>(() => {}));
+  const reporter = createTelemetry({ version: "0.8.0", fetch: send })!;
+  reporter.start("chatgpt relay", {});
+  for (let i = 0; i < 1000; i++) {
+    reporter.request(
+      {
+        event: "cli.request.started",
+        api: {
+          cliRequestId: "11111111-1111-4111-8111-111111111111",
+          method: "POST",
+          route: "/api/model-credential-authorizations/relay/heartbeat",
+        },
+      },
+      {},
+    );
+  }
+  await vi.advanceTimersByTimeAsync(0);
+  expect(send).toHaveBeenCalledTimes(8);
+  expect(vi.getTimerCount()).toBe(8);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(vi.getTimerCount()).toBe(0);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(send).toHaveBeenCalledTimes(8);
+  const finished = reporter.finish(0, undefined, false, {});
+  await vi.advanceTimersByTimeAsync(500);
+  await finished;
+  expect(send).toHaveBeenCalledTimes(9);
+  expect(vi.getTimerCount()).toBe(0);
+});

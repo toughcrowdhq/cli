@@ -28,6 +28,7 @@ export async function bindChatGptRelayListener(
 ): Promise<ChatGptRelayListener> {
   let relayUrl: URL | undefined;
   let expectedState: string | undefined;
+  let warnedInvalidCallback = false;
   let resolveRedirect!: () => void;
   const redirected = new Promise<void>((resolve) => {
     resolveRedirect = resolve;
@@ -74,7 +75,10 @@ export async function bindChatGptRelayListener(
     if (!isValidCallback(callbackUrl, expectedState)) {
       const message =
         "The authorization callback is invalid or does not match this relay. Return to Tough Crowd and restart ChatGPT authorization.";
-      options.onInvalidCallback?.(message);
+      if (!warnedInvalidCallback) {
+        warnedInvalidCallback = true;
+        options.onInvalidCallback?.(message);
+      }
       options.onEvent?.({
         event: "request_rejected",
         reason: "invalid_callback",

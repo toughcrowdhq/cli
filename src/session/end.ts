@@ -16,14 +16,25 @@ export interface EndSessionCommandOptions {
   json?: boolean;
 }
 
+export interface EndSessionRuntime extends SessionRuntime {
+  createIdempotencyKey(): string;
+}
+
 export async function end(
-  runtime: SessionRuntime,
+  runtime: EndSessionRuntime,
   options: EndSessionCommandOptions,
 ): Promise<void> {
   try {
     const apiRuntime = await resolveAuthenticatedSessionApiRuntime(runtime);
+    const idempotencyKey = runtime.createIdempotencyKey().trim();
+    if (idempotencyKey.length === 0 || idempotencyKey.length > 200) {
+      throw new SessionCommandError(
+        `Could not ${options.action} session: failed to generate an idempotency key.`,
+      );
+    }
     const result = await endSession({
       ...apiRuntime,
+      idempotencyKey,
       action: options.action,
       sessionId: options.sessionId,
     });

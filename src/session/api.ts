@@ -68,6 +68,7 @@ export interface EndSessionOptions {
   sessionId: string;
   apiOrigin: string;
   authorization: string;
+  idempotencyKey: string;
   signal: AbortSignal;
   version: string;
   fetch?: RequestJsonOptions<SessionActionResult>["fetch"];
@@ -82,6 +83,7 @@ export function endSession(
     method: "POST",
     path: `/api/sessions/${options.sessionId}/${options.action}`,
     authorization: options.authorization,
+    idempotencyKey: options.idempotencyKey,
     signal: options.signal,
     fetch: options.fetch,
     timers: options.timers,

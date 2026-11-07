@@ -76,6 +76,7 @@ describe("session end commands", () => {
         method: "POST",
         authorization: "Bearer tc_secret",
         client: "@toughcrowd/cli/0.4.0-test",
+        idempotencyKey: "session-end-key",
         body: undefined,
       },
     ]);
@@ -103,10 +104,95 @@ describe("session end commands", () => {
       `{"session":{"id":"${sessionId}","status":"abandoned"}}\n`,
     );
     expect(runtime.stderr.output).toBe("");
+    expect(fetch.calls[0]?.idempotencyKey).toBe("session-end-key");
     expect(fetch.calls[0]?.url).toBe(
       `https://api.toughcrowd.dev/api/sessions/${sessionId}/abandon`,
     );
   });
+
+  it.each(["cancel", "abandon"])(
+    "%s generates one key and sends it to an enforcing API",
+    async (action) => {
+      let generatedKeys = 0;
+      const status = action === "cancel" ? "cancelled" : "abandoned";
+      const fetch = createFetch((_url, init) => {
+        if (
+          new Headers(init.headers).get("idempotency-key") !== "operation-key"
+        ) {
+          return jsonResponse(
+            {
+              error: {
+                code: "bad-request",
+                message: "Idempotency-Key header is required.",
+              },
+            },
+            400,
+          );
+        }
+        return jsonResponse({ session: { id: sessionId, status } });
+      });
+      const runtime = createRuntime({
+        env: { TOUGHCROWD_API_KEY: "tc_secret" },
+        fetch,
+        createIdempotencyKey: () => {
+          generatedKeys += 1;
+          return " operation-key ";
+        },
+      });
+
+      expect(
+        await runCli(["session", action, sessionId, "--json"], runtime),
+      ).toBe(0);
+      expect(generatedKeys).toBe(1);
+      expect(fetch.calls).toHaveLength(1);
+      expect(runtime.stdout.output).toBe(
+        `{"session":{"id":"${sessionId}","status":"${status}"}}\n`,
+      );
+      expect(runtime.stderr.output).toBe("");
+    },
+  );
+
+  it("uses distinct UUIDs for independent operations on the same session", async () => {
+    const fetch = createFetch(() =>
+      jsonResponse({ session: { id: sessionId, status: "cancelled" } }),
+    );
+    for (const action of ["cancel", "cancel", "abandon"]) {
+      const runtime = createAuthenticatedRuntime(fetch);
+      delete runtime.createIdempotencyKey;
+      expect(
+        await runCli(["session", action, sessionId, "--json"], runtime),
+      ).toBe(0);
+    }
+
+    const keys = fetch.calls.map((call) => call.idempotencyKey);
+    for (const key of keys) {
+      expect(key).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    }
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it.each(["cancel", "abandon"])(
+    "%s rejects an invalid generated key before sending a request",
+    async (action) => {
+      const fetch = createFetch(() => {
+        throw new Error("request must not run");
+      });
+      const runtime = createRuntime({
+        env: { TOUGHCROWD_API_KEY: "tc_secret" },
+        fetch,
+        createIdempotencyKey: () => " ",
+      });
+
+      expect(await runCli(["session", action, sessionId], runtime)).toBe(1);
+      expect(fetch.calls).toEqual([]);
+      expect(runtime.stdout.output).toBe("");
+      expect(runtime.stderr.output).toBe(
+        `Could not ${action} session: failed to generate an idempotency key.\n`,
+      );
+    },
+  );
 
   it("rejects a non-UUID session ID before authentication or a request", async () => {
     const fetch = createFetch(() => {
@@ -184,6 +270,7 @@ interface TestFetchCall {
   method: string | undefined;
   authorization: string | null;
   client: string | null;
+  idempotencyKey: string | null;
   body: BodyInit | null | undefined;
 }
 
@@ -200,7 +287,15 @@ function createAuthenticatedRuntime(fetch: FetchLike) {
 
 function createRuntime(
   overrides: Partial<
-    Pick<CliRuntime, "version" | "signal" | "env" | "credentialStore" | "fetch">
+    Pick<
+      CliRuntime,
+      | "version"
+      | "signal"
+      | "env"
+      | "credentialStore"
+      | "fetch"
+      | "createIdempotencyKey"
+    >
   > = {},
 ): CliRuntime & { stdout: CapturedWritable; stderr: CapturedWritable } {
   return {
@@ -213,6 +308,8 @@ function createRuntime(
     credentialStore:
       overrides.credentialStore ?? createMemoryCredentialStore({}),
     fetch: overrides.fetch,
+    createIdempotencyKey:
+      overrides.createIdempotencyKey ?? (() => "session-end-key"),
   };
 }
 
@@ -248,6 +345,7 @@ function createFetch(
       method: init.method,
       authorization: headers.get("authorization"),
       client: headers.get("x-toughcrowd-client"),
+      idempotencyKey: headers.get("idempotency-key"),
       body: init.body,
     });
     return await responder(url, init);

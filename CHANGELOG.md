@@ -1,5 +1,11 @@
 # @toughcrowd/cli
 
+## 0.9.1
+
+### Patch Changes
+
+- ab59da4: Send an Idempotency-Key when cancelling or abandoning a session so the API accepts these requests.
+
 ## 0.9.0
 
 ### Minor Changes
